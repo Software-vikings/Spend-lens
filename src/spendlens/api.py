@@ -1,4 +1,4 @@
-"""Hardened SpendLens API with API-key roles and basic request throttling.
+"""SpendLens API for upload analysis and protected operational workflows.
 
 This is a single-process portfolio deployment baseline, not a substitute for
 an enterprise identity provider, distributed rate limiter or security review.
