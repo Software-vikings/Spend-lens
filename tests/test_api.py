@@ -398,3 +398,53 @@ def test_claim_resolution_requires_reason_and_only_handles_exception_outcomes(tm
     assert client.post(url,headers=headers,json={"action":"REJECT","reviewer":"Analyst A","reason":"Not compliant"}).status_code==409
     assert client.post("/v1/claims/DOES-NOT-EXIST/resolution",headers=headers,
       json={"action":"REJECT","reviewer":"Analyst A","reason":"Not compliant"}).status_code==404
+
+
+def test_exception_workflow_submission_assignment_resolution_and_audit(tmp_path):
+    db,_=prepared_db(tmp_path)
+    client=TestClient(create_app(db,api_keys=KEYS))
+    expense={"expense_id":"E2E-CLAIM-001","employee_id":"EMP-E2E",
+      "merchant_name":"City Cafe","department":"Sales","amount":"85.00","currency":"EUR",
+      "category":"Meals","transaction_date":"2026-06-02","business_purpose":"Client lunch",
+      "receipt":{"provided":False}}
+
+    submitted=client.post("/v1/expenses/evaluate",
+      headers={"X-API-Key":ANALYST,"Idempotency-Key":"e2e-workflow-001"},
+      json={"expense":expense})
+    assert submitted.status_code==200
+    decision=submitted.json()
+    assert decision["outcome"]=="INSUFFICIENT_DATA"
+
+    queue=client.get("/v1/exception-queue",headers={"X-API-Key":VIEWER})
+    assert queue.status_code==200
+    assert any(item["claim_id"]=="E2E-CLAIM-001" for item in queue.json()["items"])
+
+    assigned=client.post("/v1/claims/E2E-CLAIM-001/assignment",
+      headers={"X-API-Key":ANALYST},
+      json={"assignee":"Analyst One","assigned_by":"Team Lead",
+        "priority":"HIGH","sla_hours":12,"note":"Check missing receipt"})
+    assert assigned.status_code==200
+
+    resolved=client.post("/v1/claims/E2E-CLAIM-001/resolution",
+      headers={"X-API-Key":ANALYST},
+      json={"action":"REQUEST_INFORMATION","reviewer":"Analyst One",
+        "reason":"Receipt is missing","evidence_note":"Requested receipt from employee"})
+    assert resolved.status_code==200
+    assert resolved.json()["resolution_status"]=="AWAITING_INFORMATION"
+
+    detail=client.get("/v1/claims/E2E-CLAIM-001",headers={"X-API-Key":VIEWER})
+    assert detail.status_code==200
+    claim=detail.json()
+    assert claim["current_status"]=="INSUFFICIENT_DATA"
+    assert claim["resolution_status"]=="AWAITING_INFORMATION"
+    assert claim["current_assignment"]["assignee"]=="Analyst One"
+    assert len(claim["assignment_history"])==1
+    assert len(claim["resolution_history"])==1
+    assert claim["submissions"][0]["decision_id"]==decision["decision_id"]
+
+    audit=client.get("/v1/audit-events?entity_type=claim&entity_id=E2E-CLAIM-001",
+      headers={"X-API-Key":ADMIN})
+    assert audit.status_code==200
+    event_types={item["event_type"] for item in audit.json()["items"]}
+    assert event_types=={"CLAIM_ASSIGNED","CLAIM_RESOLVED"}
+    assert client.get("/v1/audit-events",headers={"X-API-Key":VIEWER}).status_code==403
