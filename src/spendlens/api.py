@@ -4,7 +4,7 @@ This is a single-process portfolio deployment baseline, not a substitute for
 an enterprise identity provider, distributed rate limiter or security review.
 """
 from __future__ import annotations
-import json, os, secrets, time, logging, uuid
+import json, os, secrets, time, logging, uuid, math
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Literal
