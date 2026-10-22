@@ -75,6 +75,8 @@ def evaluate_expense(expense: dict, policy: dict) -> dict:
     amount = _amount(expense.get("amount"))
     if amount is None and "amount" not in missing:
         missing.append("valid amount")
+    elif amount == Decimal("0.00"):
+        missing.append("amount must be greater than zero")
     if missing:
         insufficient = True
         checks.append(_result("INPUT-001", "Required expense data", "INSUFFICIENT",
@@ -93,11 +95,20 @@ def evaluate_expense(expense: dict, policy: dict) -> dict:
         insufficient = True
         checks.append(_result("INPUT-002", "Expense date", "INSUFFICIENT",
             "A valid ISO expense date is required.", {"value": expense.get("transaction_date")}, "INSUFFICIENT_DATA"))
+    elif date.fromisoformat(str(expense["transaction_date"])) > date.today():
+        insufficient = True
+        checks.append(_result("INPUT-002", "Expense date", "INSUFFICIENT",
+            "The expense date is in the future. Check the submitted date before evaluation.",
+            {"date": expense["transaction_date"], "evaluated_on": date.today().isoformat()}, "INSUFFICIENT_DATA"))
     else:
         checks.append(_result("INPUT-002", "Expense date", "PASS",
-            "Expense date is valid.", {"date": expense["transaction_date"]}))
+            "Expense date is valid and is not in the future.", {"date": expense["transaction_date"]}))
 
-    if expense.get("currency") and expense["currency"] != policy["currency"]:
+    if expense.get("currency") and (len(str(expense["currency"])) != 3 or not str(expense["currency"]).isalpha()):
+        insufficient = True
+        checks.append(_result("INPUT-003", "Currency format", "INSUFFICIENT",
+            "Currency must be a three-letter ISO-style code.", {"currency": expense["currency"]}, "INSUFFICIENT_DATA"))
+    elif expense.get("currency") and expense["currency"] != policy["currency"]:
         needs_review = True
         checks.append(_result("POL-001", "Policy currency", "REVIEW",
             "Expense currency differs from the policy currency; conversion is not configured.",
