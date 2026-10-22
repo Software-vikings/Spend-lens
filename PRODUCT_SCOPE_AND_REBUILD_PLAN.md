@@ -145,11 +145,11 @@ A synthetic expense can be submitted, automatically evaluated against a versione
 
 ### Verified CI evidence
 
-- Workflow: SpendLens CI, run #65
-- Run ID: 39757279432
-- Result: success
-- Pytest: 44 passed, 1 deprecation warning, 1.51 seconds
+- Workflow: SpendLens CI, run #71 (latest PR head) and run #65 (implementation head)
+- Latest run ID: 39769318304 — success
+- Latest pytest: 44 passed, 1 deprecation warning, 1.53 seconds
 - Additional successful steps: synthetic pipeline, multi-seed validation, Python compileall and dashboard JavaScript syntax check.
-- Run URL: https://github.com/Software-vikings/Spend-lens/actions/runs/39757279432
+- Latest run URL: https://github.com/Software-vikings/Spend-lens/actions/runs/39769318304
+- Earlier implementation run #65 also passed all steps.
 
 The phase 2 engine/API slice is now CI-verified, but Phase 2 is not fully complete because override, re-evaluation and audit lifecycle acceptance tests are not present. The dashboard is not browser-verified. The PR remains a draft and has not been merged.
