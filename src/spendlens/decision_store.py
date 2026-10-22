@@ -208,6 +208,25 @@ def get_decision(db_path: str | Path, decision_id: str) -> dict | None:
     return item
 
 
+
+def list_claims(db_path: str | Path, status: str | None = None,
+                limit: int = 100, offset: int = 0) -> dict:
+    clauses, params = [], []
+    if status:
+        clauses.append("current_status=?")
+        params.append(status)
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    with connect(db_path) as conn:
+        total = conn.execute("SELECT COUNT(*) n FROM expense_claims" + where, params).fetchone()["n"]
+        rows = conn.execute(
+            "SELECT claim_id,employee_id,merchant_name,department,amount,currency,category,"
+            "transaction_date,current_status,created_at,updated_at,latest_decision_id "
+            "FROM expense_claims" + where + " ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+            params + [limit, offset]
+        ).fetchall()
+    return {"total": total, "limit": limit, "offset": offset, "items": [dict(row) for row in rows]}
+
+
 def get_claim(db_path: str | Path, claim_id: str) -> dict | None:
     with connect(db_path) as conn:
         claim = conn.execute("SELECT * FROM expense_claims WHERE claim_id=?", (claim_id,)).fetchone()
