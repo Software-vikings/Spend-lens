@@ -178,3 +178,12 @@ def test_expense_evaluation_missing_evidence_is_not_approved(tmp_path):
     response=client.post("/v1/expenses/evaluate",json=body,headers={"X-API-Key":ANALYST})
     assert response.status_code==200
     assert response.json()["outcome"]=="INSUFFICIENT_DATA"
+
+
+def test_finding_detail_requires_authentication_and_allows_viewer(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    item=client.get("/v1/findings",headers={"X-API-Key":VIEWER}).json()["items"][0]
+    url=f"/v1/findings/{item['finding_id']}"
+    assert client.get(url).status_code == 401
+    assert client.get(url,headers={"X-API-Key":"invalid-key"}).status_code == 401
+    assert client.get(url,headers={"X-API-Key":VIEWER}).status_code == 200
