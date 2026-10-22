@@ -349,3 +349,49 @@ def test_policy_activation_requires_admin_and_unknown_version_is_404(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
     assert client.post("/v1/policies/UNKNOWN/9.9/activate",headers={"X-API-Key":ANALYST}).status_code==403
     assert client.post("/v1/policies/UNKNOWN/9.9/activate",headers={"X-API-Key":ADMIN}).status_code==404
+
+
+def test_claim_resolution_preserves_automated_decision_and_audits_actions(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    expense={"expense_id":"CLAIM-RESOLVE-001","employee_id":"EMP-RESOLVE",
+      "merchant_name":"City Cafe","department":"Sales","amount":"85.00","currency":"EUR",
+      "category":"Meals","transaction_date":"2026-05-20","business_purpose":"Client lunch",
+      "receipt":{"provided":False}}
+    submitted=client.post("/v1/expenses/evaluate",headers={"X-API-Key":ANALYST},json={"expense":expense})
+    assert submitted.status_code==200
+    original=submitted.json()
+    assert original["outcome"]=="INSUFFICIENT_DATA"
+    url="/v1/claims/CLAIM-RESOLVE-001/resolution"
+    body={"action":"REQUEST_INFORMATION","reviewer":"Analyst A",
+          "reason":"Receipt is required for this category","evidence_note":"Requested original receipt"}
+    assert client.post(url,headers={"X-API-Key":VIEWER},json=body).status_code==403
+    requested=client.post(url,headers={"X-API-Key":ANALYST},json=body)
+    assert requested.status_code==200
+    approved=client.post(url,headers={"X-API-Key":ADMIN},json={
+      "action":"APPROVE","reviewer":"Finance Lead","reason":"Receipt reviewed outside this prototype",
+      "evidence_note":"Evidence review is self-reported; no file is stored."})
+    assert approved.status_code==200
+    detail=client.get("/v1/claims/CLAIM-RESOLVE-001",headers={"X-API-Key":VIEWER}).json()
+    assert detail["current_status"]=="INSUFFICIENT_DATA"
+    assert detail["resolution_status"]=="HUMAN_APPROVED"
+    assert len(detail["resolution_history"])==2
+    decision=client.get(f"/v1/decisions/{original['decision_id']}",headers={"X-API-Key":VIEWER}).json()
+    assert decision["outcome"]=="INSUFFICIENT_DATA"
+    assert decision["evaluation"]["outcome"]=="INSUFFICIENT_DATA"
+
+
+def test_claim_resolution_requires_reason_and_only_handles_exception_outcomes(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":ANALYST}
+    approved_expense={"expense_id":"CLAIM-RESOLVE-002","employee_id":"EMP-OK",
+      "merchant_name":"Office Depot","department":"Operations","amount":"25.00",
+      "currency":"EUR","category":"Office Supplies","transaction_date":"2026-05-21",
+      "business_purpose":"Stationery","receipt":{"provided":True,"readable":True,
+      "receipt_id":"RCPT-OK","total":"25.00"}}
+    result=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":approved_expense})
+    assert result.status_code==200 and result.json()["outcome"]=="APPROVE"
+    url="/v1/claims/CLAIM-RESOLVE-002/resolution"
+    assert client.post(url,headers=headers,json={"action":"REJECT","reviewer":"Analyst A","reason":" "}).status_code==422
+    assert client.post(url,headers=headers,json={"action":"REJECT","reviewer":"Analyst A","reason":"Not compliant"}).status_code==409
+    assert client.post("/v1/claims/DOES-NOT-EXIST/resolution",headers=headers,
+      json={"action":"REJECT","reviewer":"Analyst A","reason":"Not compliant"}).status_code==404
