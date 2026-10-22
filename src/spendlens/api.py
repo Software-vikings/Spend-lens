@@ -322,11 +322,12 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
     def exception_queue(status: str | None = None, assignee: str | None = None,
                         priority: Literal["LOW","NORMAL","HIGH","URGENT"] | None = None,
                         overdue: bool | None = None,
+                        sort: Literal["priority","sla","newest"] = "priority",
                         limit: int = Query(50, ge=1, le=200),
                         offset: int = Query(0, ge=0),
                         _: str = Depends(require_role("viewer"))):
         db()
-        return list_exception_queue(db_path, status, assignee, priority, overdue, limit, offset)
+        return list_exception_queue(db_path, status, assignee, priority, overdue, limit, offset, sort)
 
     @app.post("/v1/claims/{claim_id}/assignment")
     def claim_assignment(claim_id: str, body: ClaimAssignmentRequest,
