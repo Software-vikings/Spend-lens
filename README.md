@@ -14,7 +14,7 @@ SpendLens turns an employer's transaction export into an explainable review list
 - Flags future-dated records for checking and keeps negative-value credits/refunds visible.
 - Shows data coverage, currency totals, row-level explanations and a downloadable CSV review report.
 
-The upload workflow analyses the submitted file in memory. It does not insert uploaded rows into the existing application database or retain a saved import history. Results are held in the current browser page and are cleared when the page is refreshed.
+The upload workflow analyses the submitted file during the request and does not insert uploaded rows into the application database or retain a saved import history. The multipart framework may temporarily spool request data to server-managed temporary storage before analysis; the request file is closed after processing. Results are held in the current browser page and are cleared when the page is refreshed.
 
 ## What it does not claim
 
