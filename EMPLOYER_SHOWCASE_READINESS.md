@@ -80,3 +80,26 @@ A configuration file is not equivalent to a verified deployment; a workflow file
 SpendLens is an independent prototype using synthetic EUR transactions. Findings are human-review signals, not proof of fraud, policy violation, waste or supplier overcharging. Synthetic precision/recall must not be presented as expected real-world performance. The peer baseline currently uses in-sample peers and may include future-dated transactions. The project is not connected to Pleo, a bank or real employer data, and is not production-certified.
 
 **Current decision:** The full source and documentation are now present in GitHub, and hosted CI has passed for the source commit. SpendLens is close to being a credible employer demo, but manual fresh-clone/browser evidence, screenshots and Docker verification remain.
+
+## Execution tracker — 22 October 2026
+
+This tracker records the remaining work as open until the stated acceptance evidence is available. Automated CI success is not a substitute for these manual/runtime checks.
+
+| ID | Priority | Task | Acceptance evidence | Status |
+|---|---|---|---|---|
+| SHOW-01 | P0 | Fresh-clone application walkthrough | Clean clone starts successfully; sign-in, overview, findings detail, analyst review update and transaction search work in a browser | Open |
+| SHOW-02 | P0 | Capture dashboard evidence | Genuine screenshots for overview, findings queue/detail and transaction explorer committed and linked from README | Open |
+| SHOW-03 | P0 | Verify setup documentation | README commands and links verified from a separate clean clone | Open |
+| SHOW-04 | P1 | Docker runtime verification | Image builds; container starts; health check passes; persisted data survives container recreation | Open |
+| SHOW-05 | P1 | Historical-only validation | Time-ordered evaluation uses only information available at each scoring timestamp; leakage limitations documented | Open |
+| SHOW-06 | P1 | Power BI report | Native PBIX created and opened successfully, or environment limitation documented and CSV/guide scope retained | Open |
+| SHOW-07 | P1 | Dependency/security checks | Dependency vulnerability scan and documented API/security review completed; findings triaged | Open |
+| SHOW-08 | P1 | Demo deployment decision | Either verified synthetic-only deployment with TLS/access controls, or an explicit decision to keep the project local | Open |
+| SHOW-09 | P2 | Architecture and investigation walkthrough | Architecture diagram and one end-to-end finding case added to the repository | Open |
+| SHOW-10 | P2 | Interview preparation | Trade-offs, false positives, synthetic data and security boundaries documented for discussion | Open |
+
+### Execution notes
+
+- The repository's latest recorded hosted CI run is green; the CI workflow covers dependency installation, automated tests, the synthetic pipeline, multi-seed validation and Python compilation.
+- Manual browser behavior, Docker runtime, historical-only backtesting and native PBIX creation have not been verified. Do not mark these complete based solely on configuration files or automated unit tests.
+- Update each row only after its acceptance evidence is committed or linked.
