@@ -40,11 +40,11 @@ def init_policy_registry(db_path: str | Path, seed_policy: dict | None = None) -
 
 def _insert_policy_audit(conn, event_type: str, policy_id: str, version: str, actor: str, now: str) -> None:
     """Write policy audit data in the same transaction as the policy change."""
-    conn.execute(\"\"\"INSERT INTO audit_events
+    conn.execute("""INSERT INTO audit_events
       (event_id,event_type,entity_type,entity_id,actor,details,created_at)
-      VALUES(?,?,?,?,?,?,?)\"\"\",
-      (str(uuid.uuid4()), event_type, \"policy\", f\"{policy_id}:{version}\", actor,
-       json.dumps({\"policy_id\": policy_id, \"version\": version}, sort_keys=True), now))
+      VALUES(?,?,?,?,?,?,?)""",
+      (str(uuid.uuid4()), event_type, "policy", f"{policy_id}:{version}", actor,
+       json.dumps({"policy_id": policy_id, "version": version}, sort_keys=True), now))
 
 
 def create_policy_version(db_path: str | Path, policy: dict, created_by: str) -> dict:
