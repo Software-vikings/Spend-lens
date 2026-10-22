@@ -5,7 +5,7 @@ import hashlib
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from .phase4 import connect
@@ -86,6 +86,19 @@ def init_decisions(db_path: str | Path) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_claim_resolution_claim
           ON claim_resolution_events(claim_id,created_at);
+        CREATE TABLE IF NOT EXISTS claim_assignment_events (
+          assignment_id TEXT PRIMARY KEY,
+          claim_id TEXT NOT NULL REFERENCES expense_claims(claim_id),
+          assignee TEXT NOT NULL,
+          priority TEXT NOT NULL CHECK(priority IN ('LOW','NORMAL','HIGH','URGENT')),
+          sla_hours INTEGER NOT NULL CHECK(sla_hours BETWEEN 1 AND 720),
+          due_at TEXT NOT NULL,
+          assigned_by TEXT NOT NULL,
+          note TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_claim_assignment_claim
+          ON claim_assignment_events(claim_id,created_at);
 
         """)
 
@@ -308,3 +321,73 @@ def list_claim_resolutions(db_path: str | Path, claim_id: str) -> list[dict]:
             "SELECT resolution_id,action,previous_status,new_status,reviewer,reason,evidence_note,created_at FROM claim_resolution_events WHERE claim_id=? ORDER BY created_at,rowid",
             (claim_id,)).fetchall()
     return [dict(row) for row in rows]
+
+def assign_claim(db_path: str | Path, claim_id: str, assignee: str,
+                 assigned_by: str, priority: str = "NORMAL",
+                 sla_hours: int = 24, note: str = "") -> dict:
+    priority = priority.upper()
+    if priority not in {"LOW", "NORMAL", "HIGH", "URGENT"}:
+        raise ValueError("Priority must be LOW, NORMAL, HIGH or URGENT")
+    if not 1 <= int(sla_hours) <= 720:
+        raise ValueError("SLA must be between 1 and 720 hours")
+    if not assignee.strip() or not assigned_by.strip():
+        raise ValueError("Assignee and assigning reviewer are required")
+    now = datetime.now(timezone.utc)
+    event = {"assignment_id": str(uuid.uuid4()), "claim_id": claim_id,
+             "assignee": assignee.strip(), "priority": priority,
+             "sla_hours": int(sla_hours),
+             "due_at": (now + timedelta(hours=int(sla_hours))).isoformat(),
+             "assigned_by": assigned_by.strip(), "note": note.strip(),
+             "created_at": now.isoformat()}
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("SELECT 1 FROM expense_claims WHERE claim_id=?", (claim_id,)).fetchone() is None:
+            raise LookupError("Expense claim not found")
+        conn.execute("""INSERT INTO claim_assignment_events
+          (assignment_id,claim_id,assignee,priority,sla_hours,due_at,assigned_by,note,created_at)
+          VALUES(?,?,?,?,?,?,?,?,?)""",
+          tuple(event[k] for k in ("assignment_id","claim_id","assignee","priority","sla_hours","due_at","assigned_by","note","created_at")))
+    return event
+
+
+def list_exception_queue(db_path: str | Path, status: str | None = None,
+                         assignee: str | None = None, priority: str | None = None,
+                         overdue: bool | None = None, limit: int = 50,
+                         offset: int = 0) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    clauses = ["c.current_status IN ('REVIEW','INSUFFICIENT_DATA')"]
+    params = []
+    if status:
+        clauses.append("COALESCE(r.new_status,c.current_status)=?")
+        params.append(status)
+    if assignee:
+        clauses.append("a.assignee=?")
+        params.append(assignee)
+    if priority:
+        clauses.append("a.priority=?")
+        params.append(priority.upper())
+    if overdue is True:
+        clauses.append("a.due_at IS NOT NULL AND a.due_at < ?")
+        params.append(now)
+    elif overdue is False:
+        clauses.append("(a.due_at IS NULL OR a.due_at >= ?)")
+        params.append(now)
+    where = " WHERE " + " AND ".join(clauses)
+    joins = """ FROM expense_claims c
+      LEFT JOIN (SELECT claim_id,new_status FROM (
+        SELECT claim_id,new_status,ROW_NUMBER() OVER(PARTITION BY claim_id ORDER BY created_at DESC,rowid DESC) rn
+        FROM claim_resolution_events) WHERE rn=1) r ON r.claim_id=c.claim_id
+      LEFT JOIN (SELECT claim_id,assignee,priority,sla_hours,due_at,assigned_by,note,created_at FROM (
+        SELECT *,ROW_NUMBER() OVER(PARTITION BY claim_id ORDER BY created_at DESC,rowid DESC) rn
+        FROM claim_assignment_events) WHERE rn=1) a ON a.claim_id=c.claim_id"""
+    with connect(db_path) as conn:
+        total = conn.execute("SELECT COUNT(*) n" + joins + where, params).fetchone()["n"]
+        rows = conn.execute("""SELECT c.claim_id,c.employee_id,c.merchant_name,c.department,
+          c.amount,c.currency,c.category,c.current_status,c.created_at,c.updated_at,
+          COALESCE(r.new_status,c.current_status) resolution_status,
+          a.assignee,a.priority,a.sla_hours,a.due_at,a.assigned_by,a.note assignment_note,
+          a.created_at assigned_at,
+          CASE WHEN a.due_at IS NOT NULL AND a.due_at < ? THEN 1 ELSE 0 END overdue
+        """ + joins + where + " ORDER BY CASE a.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, a.due_at IS NULL, a.due_at, c.created_at LIMIT ? OFFSET ?",
+          [now] + params + [limit, offset]).fetchall()
+    return {"total": total, "limit": limit, "offset": offset, "items": [dict(row) for row in rows]}
