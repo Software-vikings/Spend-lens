@@ -2,37 +2,95 @@
 
 **An explainable business-spending intelligence prototype.**
 
-SpendLens analyses synthetic company expenses to surface unusual transactions and potential cost inefficiencies for human review. It is an independent portfolio project; it is not connected to Pleo, a bank or any real financial institution.
+SpendLens analyses synthetic company expense transactions to surface unusual patterns and potential cost inefficiencies for human review. It is an independent portfolio project and is not connected to Pleo, a bank or any real financial institution.
 
-## Local implementation status
+> **Demo data only:** all transactions are synthetic and denominated in EUR. Findings are screening signals, not fraud verdicts, policy determinations or proof of savings.
 
-The complete Phase 7 application has been implemented and tested locally. The full application source, dashboard, tests, SQL, reports and Power BI guidance have **not yet been synced to this GitHub repository**. Until that sync and a clean-clone verification are complete, this repository must not be represented as a runnable release.
+## What it does
 
-## Capabilities implemented locally
+- Generates reproducible synthetic company expense records and stores them in SQLite.
+- Screens unusually high transactions against merchant/category peers using median absolute deviation (MAD).
+- Identifies recurring-payment changes, merchant amount drift, duplicate candidates and fragmented-purchase patterns.
+- Analyses monthly department spend and spend per employee using explicit headcount inputs.
+- Exposes authenticated FastAPI endpoints for summary, analytics, transactions, findings and analyst review.
+- Provides a browser dashboard with spend overview, findings queue, transaction explorer and review history.
+- Produces SQL analytics, Power BI-ready CSV exports and a multi-seed validation report.
 
-- Deterministic synthetic transaction generation and SQLite persistence.
-- Peer-group anomaly screening using median absolute deviation (MAD).
-- Recurring-payment, merchant-price-drift, duplicate and fragmented-purchase screens.
-- Department spend-per-employee analysis.
-- FastAPI analytics endpoints, API-key authentication and role-based review permissions.
-- Persistent findings, review notes and review-event history.
-- Browser-based analyst dashboard and searchable transaction explorer.
-- SQL analytics, Power BI-ready exports and multi-seed synthetic validation.
+## Architecture
 
-## Local verification
+```text
+Synthetic generator
+       |
+       v
+Validation -> SQLite database -> Detection / insight screens
+                                      |
+                                      v
+                                Persistent findings
+                                      |
+                         +------------+------------+
+                         |                         |
+                      FastAPI                 Power BI exports
+                         |
+                         v
+                 Browser analyst dashboard
+```
 
-The latest local verification recorded 30 passing automated tests, successful Python compilation and a successful JavaScript syntax check. These results apply to the local project, not to the incomplete GitHub copy. Docker build/runtime and hosted GitHub Actions are not yet verified.
+## Run locally
+
+Requires Python 3.10+.
+
+```bash
+git clone https://github.com/Software-vikings/Spend-lens.git
+cd Spend-lens
+
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+PYTHONPATH=src python -m spendlens.pipeline
+PYTHONPATH=src python -m spendlens.validation
+PYTHONPATH=src pytest -q
+```
+
+Create a long random API key (at least 24 characters), then start the API:
+
+```bash
+export SPENDLENS_API_KEYS="YOUR_LONG_RANDOM_KEY:analyst"
+PYTHONPATH=src uvicorn spendlens.api:app --host 127.0.0.1 --port 8000
+```
+
+Open http://127.0.0.1:8000 and enter the API key. The dashboard stores it in the current browser tab's session storage. Do not commit real keys or use real employee/financial records.
+
+## API
+
+- `GET /health` — health check
+- `GET /v1/summary` — spend and finding summary
+- `GET /v1/analytics/overview` — monthly, department and category aggregates
+- `GET /v1/transactions` — searchable and paginated transactions
+- `GET /v1/findings` — findings queue
+- `GET /v1/findings/{finding_id}` — finding detail and review history
+- `PATCH /v1/findings/{finding_id}/review` — analyst review update
+
+All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role can update review state. The admin role currently has the same application permissions as analyst.
+
+## Tests and CI
+
+Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions is configured to install dependencies, run tests, execute the synthetic pipeline and validation, and compile the Python source on pushes and pull requests. A workflow file being present is not itself proof of a green hosted run; check the Actions tab for the latest run.
+
+## Power BI
+
+The pipeline generates Power BI-ready CSV exports under `reports/`. See [Power BI build guide](powerbi/POWER_BI_BUILD_GUIDE.md) for the recommended semantic model, DAX measures and report pages. A native `.pbix` file is not included.
 
 ## Employer showcase readiness
 
-**Current estimated completion: 61%.** This is a weighted estimate of work completed toward an employer-showcaseable project, not production readiness. The immediate blockers are the complete GitHub source sync, fresh-clone installation/run, green hosted CI, authentic dashboard screenshots and deployment verification.
+**Current weighted estimate: 67%.** The full application source, dashboard, tests, SQL, CI configuration, Docker configuration and project documentation are now present in this GitHub repository. Remaining showcase blockers include a fresh-clone installation/run, a verified green hosted CI run, genuine dashboard screenshots, Docker build/runtime verification and stronger time-ordered analytical validation.
 
-See [EMPLOYER_SHOWCASE_READINESS.md](EMPLOYER_SHOWCASE_READINESS.md) for the scoring rubric, evidence, outstanding tasks and acceptance criteria.
+See [EMPLOYER_SHOWCASE_READINESS.md](EMPLOYER_SHOWCASE_READINESS.md) for the scoring rubric, evidence and acceptance criteria.
 
-## Analytical and responsible-use caveats
+## Evaluation limitations
 
-All data is synthetic and denominated in EUR. The detector's evaluation metrics measure recovery of injected synthetic scenarios only; they do not estimate real-world fraud performance. A finding is a screening signal, not proof of fraud, policy violation, waste or supplier overcharging. The current peer baseline also has a documented temporal-leakage limitation.
+The validation dataset is synthetic and includes injected scenarios authored alongside the detector. Precision/recall figures measure recovery of those synthetic high-value outlier scenarios only; they do not estimate real-world fraud performance. The current peer baseline is in-sample and can use later-dated peer transactions, creating temporal leakage. A flag is not proof of fraud, policy violation, waste or supplier overcharging.
 
-Do not use this prototype for automated employment, credit, disciplinary or payment decisions. It is not production-certified and must not be exposed publicly or loaded with real employee/financial data without further privacy, security, operational and legal review.
+## Security boundaries
 
-See [SECURITY.md](SECURITY.md) and [PHASE7_RELEASE_NOTES.md](PHASE7_RELEASE_NOTES.md).
+This is a portfolio prototype, not a production-certified financial control platform. API keys are static configuration values, rate limiting is in-memory and per process, and there is no tenant isolation, SSO/MFA, formal penetration test or verified cloud deployment. Do not expose publicly or load real financial data without additional security, privacy, operational and legal review. See [SECURITY.md](SECURITY.md).
