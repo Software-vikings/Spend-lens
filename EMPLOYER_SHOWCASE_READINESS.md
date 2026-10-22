@@ -138,7 +138,7 @@ The product acceptance criteria and rebuild sequence are now defined in [PRODUCT
 - Pytest result: 44 passed, 1 deprecation warning, 1.51 seconds.
 - Synthetic pipeline, multi-seed validation, Python compilation and dashboard JavaScript syntax checks also passed.
 - The first deterministic decision-engine/API/workbench slice is now verified by hosted CI. This does not establish browser correctness or production suitability.
-- Product completion is re-scored at **49/100**, using the rubric in PRODUCT_SCOPE_AND_REBUILD_PLAN.md. The earlier 24/100 remains the pre-implementation baseline; 73% remains withdrawn.
+- Product completion was re-scored at **49/100**, using the rubric in PRODUCT_SCOPE_AND_REBUILD_PLAN.md. The earlier 24/100 remains the pre-implementation baseline; 73% remains withdrawn.
 - Still open: first-class claim/evidence model, policy administration, full decision audit/override/re-evaluation lifecycle, complete state-driven dashboard and chart drill-through, browser tests, clean-clone walkthrough, Docker and security/dependency verification.
 - Draft PR #3 remains open and unmerged: https://github.com/Software-vikings/Spend-lens/pull/3
 
@@ -155,3 +155,14 @@ The product acceptance criteria and rebuild sequence are now defined in [PRODUCT
 - Improved transaction drill-through, keyboard opening, amount precision/currency formatting and selected chart states.
 - Engine now treats zero amounts, future dates, malformed currency codes and missing employee/merchant/department details as insufficient data.
 - Latest changes are not yet CI-verified or browser-verified. Product score remains 49/100 until evidence is available.
+
+
+## Latest micro-detail pass — CI verified 22 October 2026
+
+- GitHub Actions SpendLens CI run #105 (ID 39770075769) passed on the latest branch head.
+- Pytest: **48 passed**, 1 warning, 1.54 seconds.
+- Synthetic pipeline, multi-seed validation, Python compilation and JavaScript syntax checks passed.
+- Run: https://github.com/Software-vikings/Spend-lens/actions/runs/39770075769
+- Current product score: **53/100** (weighted rubric in PRODUCT_SCOPE_AND_REBUILD_PLAN.md). This is a provisional code-and-CI score, not browser acceptance or production readiness.
+- Implemented: faceted chart queries; decision explanation rendering; realistic claim intake fields; explicit evidence/duplicate limitations; labelled transaction drill-through; keyboard access; currency precision; input validation; responsive detail styling.
+- Still not implemented: real receipt upload/OCR, automatic duplicate detection, persisted first-class claims/evidence, policy administration, full override/audit lifecycle, modular frontend state architecture and browser tests.
