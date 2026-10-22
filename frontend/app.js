@@ -117,7 +117,7 @@
   const loadPolicies = async () => {
     const data=await api("/v1/policies");
     state.policies=data.items||[];
-    $("policies-table").innerHTML=state.policies.map(p=>`<tr><td><strong>${esc(p.name)}</strong><div class="finding-meta">${esc(p.policy_id)}</div></td><td>${esc(p.version)}</td><td>${esc(new Date(p.created_at).toLocaleString())}</td><td>${esc(p.activated_at?new Date(p.activated_at).toLocaleString():"—")}</td><td><span class="status ${p.is_active?"confirmed":"new"}">${p.is_active?"ACTIVE":"INACTIVE"}</span></td><td><button class="secondary-btn small" data-policy-load="${esc(p.policy_id)}|${esc(p.version)}">Load</button> ${p.is_active?"":`<button class="secondary-btn small" data-policy-activate="${esc(p.policy_id)}|${esc(p.version)}">Activate</button>`}</td></tr>`).join("")||'<tr><td colspan="6" class="empty">No policy versions found</td></tr>';
+    $("policies-table").innerHTML=state.policies.map(p=>`<tr><td><strong>${esc(p.name)}</strong><div class="finding-meta">${esc(p.policy_id)}</div></td><td>${esc(p.version)}</td><td>${esc(new Date(p.created_at).toLocaleString())}</td><td>${esc(p.activated_at?new Date(p.activated_at).toLocaleString():"—")}</td><td><span class="status ${p.is_active?"confirmed":"new"}">${p.is_active?"ACTIVE":"INACTIVE"}</span></td><td><button class="secondary-btn small" data-policy-load="${esc(p.policy_id)}" data-policy-version="${esc(p.version)}">Load</button> ${p.is_active?"":`<button class="secondary-btn small" data-policy-activate="${esc(p.policy_id)}" data-policy-version="${esc(p.version)}">Activate</button>`}</td></tr>`).join("")||'<tr><td colspan="6" class="empty">No policy versions found</td></tr>';
   };
   const loadPolicyEditor = async (policyId,version) => {
     const policy=await api(`/v1/policies/${encodeURIComponent(policyId)}/${encodeURIComponent(version)}`);
@@ -259,8 +259,8 @@
     const load=e.target.closest("[data-policy-load]");
     const activate=e.target.closest("[data-policy-activate]");
     try{
-      if(load){const [id,version]=load.dataset.policyLoad.split("|");await loadPolicyEditor(id,version);}
-      if(activate){const [id,version]=activate.dataset.policyActivate.split("|");await api(`/v1/policies/${encodeURIComponent(id)}/${encodeURIComponent(version)}/activate`,{method:"POST"});toast("Policy version activated for future evaluations.");await loadPolicies();}
+      if(load){const id=load.dataset.policyLoad,version=load.dataset.policyVersion;await loadPolicyEditor(id,version);}
+      if(activate){const id=activate.dataset.policyActivate,version=activate.dataset.policyVersion;await api(`/v1/policies/${encodeURIComponent(id)}/${encodeURIComponent(version)}/activate`,{method:"POST"});toast("Policy version activated for future evaluations.");await loadPolicies();}
     }catch(err){toast(err.message);}
   });
   $("policy-save").addEventListener("click",async()=>{
