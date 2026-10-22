@@ -54,7 +54,7 @@
               <label>Expense date<input name="transaction_date" type="date" required></label>
               <label>Amount claimed<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
               <label>Currency<select name="currency"><option>EUR</option><option>USD</option><option>GBP</option><option>INR</option></select></label>
-              <label>Expense category<select name="category"><option value="">Choose a category</option><option>Meals</option><option>Software</option><option>Office Supplies</option><option>Travel</option><option>Training</option><option>Personal Entertainment</option></select></label>
+              <label>Expense category<select name="category" required><option value="">Choose a category</option><option>Meals</option><option>Software</option><option>Office Supplies</option><option>Travel</option><option>Training</option><option>Personal Entertainment</option></select></label>
               <label class="wide">Business purpose<textarea name="business_purpose" rows="2" placeholder="Explain why this expense was necessary for work…" required></textarea></label>
               <div class="form-section-label wide">RECEIPT EVIDENCE</div>
               <label>Receipt status<select name="receipt_status"><option value="provided">Receipt supplied</option><option value="missing">No receipt supplied</option><option value="unreadable">Receipt supplied but unreadable</option></select></label>
