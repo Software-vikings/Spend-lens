@@ -86,6 +86,17 @@ def init_decisions(db_path: str | Path) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_claim_resolution_claim
           ON claim_resolution_events(claim_id,created_at);
+        CREATE TABLE IF NOT EXISTS audit_events (
+          event_id TEXT PRIMARY KEY,
+          event_type TEXT NOT NULL,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          actor TEXT NOT NULL,
+          details TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_events_created ON audit_events(created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_events_entity ON audit_events(entity_type,entity_id,created_at);
         CREATE TABLE IF NOT EXISTS claim_assignment_events (
           assignment_id TEXT PRIMARY KEY,
           claim_id TEXT NOT NULL REFERENCES expense_claims(claim_id),
@@ -421,3 +432,44 @@ def list_exception_queue(db_path: str | Path, status: str | None = None,
                         "unassigned": aggregate["unassigned_count"] or 0,
                         "overdue": aggregate["overdue_count"] or 0},
             "items": [dict(row) for row in rows]}
+
+
+def record_audit_event(db_path: str | Path, event_type: str, entity_type: str,
+                       entity_id: str, actor: str, details: dict | None = None) -> dict:
+    """Append an operational audit event; existing events are never updated."""
+    if not all(str(value).strip() for value in (event_type, entity_type, entity_id, actor)):
+        raise ValueError("Audit event type, entity type, entity ID and actor are required")
+    event = {"event_id": str(uuid.uuid4()), "event_type": event_type,
+             "entity_type": entity_type, "entity_id": entity_id,
+             "actor": actor.strip(), "details": details or {},
+             "created_at": datetime.now(timezone.utc).isoformat()}
+    with connect(db_path) as conn:
+        conn.execute("""INSERT INTO audit_events
+          (event_id,event_type,entity_type,entity_id,actor,details,created_at)
+          VALUES(?,?,?,?,?,?,?)""",
+          (event["event_id"], event_type, entity_type, entity_id, actor.strip(),
+           json.dumps(event["details"], sort_keys=True), event["created_at"]))
+    return event
+
+
+def list_audit_events(db_path: str | Path, entity_type: str | None = None,
+                      entity_id: str | None = None, event_type: str | None = None,
+                      limit: int = 100, offset: int = 0) -> dict:
+    clauses, params = [], []
+    for column, value in (("entity_type", entity_type), ("entity_id", entity_id),
+                          ("event_type", event_type)):
+        if value:
+            clauses.append(column + "=?")
+            params.append(value)
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    with connect(db_path) as conn:
+        total = conn.execute("SELECT COUNT(*) n FROM audit_events" + where, params).fetchone()["n"]
+        rows = conn.execute("SELECT * FROM audit_events" + where +
+            " ORDER BY created_at DESC,event_id DESC LIMIT ? OFFSET ?",
+            params + [limit, offset]).fetchall()
+    items = []
+    for row in rows:
+        item = dict(row)
+        item["details"] = json.loads(item["details"])
+        items.append(item)
+    return {"total": total, "limit": limit, "offset": offset, "items": items}
