@@ -92,3 +92,18 @@ def test_missing_claim_identity_context_is_insufficient_data():
     assert "merchant_name" in required["evidence"]["missing_fields"]
     assert "employee_id" in required["evidence"]["missing_fields"]
     assert "department" in required["evidence"]["missing_fields"]
+
+
+def test_missing_currency_does_not_produce_a_false_policy_currency_pass():
+    result = evaluate_expense(expense(currency=""), POLICY)
+    assert result["outcome"] == "INSUFFICIENT_DATA"
+    currency_rule = next(rule for rule in result["evaluated_rules"] if rule["rule_id"] == "POL-001")
+    assert currency_rule["status"] == "INSUFFICIENT"
+    assert currency_rule["action"] == "INSUFFICIENT_DATA"
+
+
+def test_lowercase_currency_code_is_not_accepted_as_iso_style_input():
+    result = evaluate_expense(expense(currency="eur"), POLICY)
+    assert result["outcome"] == "INSUFFICIENT_DATA"
+    assert any(rule["rule_id"] == "INPUT-003" and rule["status"] == "INSUFFICIENT"
+               for rule in result["evaluated_rules"])
