@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
 from .decision_engine import evaluate_expense
-from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, find_potential_duplicate
+from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate
 
 logger = logging.getLogger("spendlens.api")
 ROOT = Path(__file__).resolve().parents[2]
@@ -238,6 +238,12 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         except ValueError as exc:
             status = 409 if "Idempotency key" in str(exc) else 422
             raise HTTPException(status, str(exc)) from exc
+
+    @app.get("/v1/claims")
+    def claims(status:str|None=None,limit:int=Query(100,ge=1,le=500),
+               offset:int=Query(0,ge=0),_:str=Depends(require_role("viewer"))):
+        db()
+        return list_claims(db_path,status,limit,offset)
 
     @app.get("/v1/claims/{claim_id}")
     def claim_detail(claim_id:str,_:str=Depends(require_role("viewer"))):
