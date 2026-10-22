@@ -43,22 +43,32 @@
         <div class="page-heading"><div><div class="eyebrow">AUTOMATED POLICY EVALUATION</div><h1>Expense decisions</h1><p>Evaluate a claim against the versioned synthetic policy. Exceptions and missing evidence are not silently approved.</p></div></div>
         <div class="decision-layout">
           <article class="panel decision-form-panel">
-            <div class="panel-head"><div><h2>Evaluate an expense</h2><p>Example policy: EUR · version 1.0.0</p></div><span class="subtle-tag">DEMO POLICY</span></div>
+            <div class="panel-head"><div><h2>New expense claim</h2><p>Enter the information normally captured from an employee submission.</p></div><span class="subtle-tag">EXAMPLE POLICY</span></div>
+            <div class="policy-context"><b>What happens when you submit?</b><span>SpendLens checks required details, category eligibility, configured limits and receipt evidence. It records an outcome and explains each rule. It does not read or verify an actual receipt image yet.</span></div>
             <form id="expense-evaluation-form" class="decision-form">
-              <label>Expense ID<input name="expense_id" value="EXP-DEMO-001" required></label>
-              <label>Amount (EUR)<input name="amount" type="number" min="0" step="0.01" value="85.00" required></label>
-              <label>Category<select name="category"><option>Meals</option><option>Software</option><option>Office Supplies</option><option>Travel</option><option>Training</option><option>Personal Entertainment</option></select></label>
-              <label>Expense date<input name="transaction_date" type="date" value="2026-05-14" required></label>
-              <label class="wide">Business purpose<input name="business_purpose" value="Project working lunch" required></label>
-              <label class="check-field"><input name="receipt_provided" type="checkbox" checked> Receipt supplied and readable</label>
-              <label>Receipt total (EUR)<input name="receipt_total" type="number" min="0" step="0.01" value="85.00"></label>
-              <button class="primary-btn wide" type="submit">Evaluate expense automatically →</button>
+              <div class="form-section-label wide">EMPLOYEE & TRANSACTION</div>
+              <label>Claim reference<input name="expense_id" placeholder="e.g. EXP-2026-001" required></label>
+              <label>Employee ID<input name="employee_id" placeholder="e.g. EMP-1042" required></label>
+              <label>Merchant / supplier<input name="merchant_name" placeholder="e.g. City Centre Hotel" required></label>
+              <label>Department<input name="department" placeholder="e.g. Sales" required></label>
+              <label>Expense date<input name="transaction_date" type="date" required></label>
+              <label>Amount claimed<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
+              <label>Currency<select name="currency"><option>EUR</option><option>USD</option><option>GBP</option><option>INR</option></select></label>
+              <label>Expense category<select name="category"><option value="">Choose a category</option><option>Meals</option><option>Software</option><option>Office Supplies</option><option>Travel</option><option>Training</option><option>Personal Entertainment</option></select></label>
+              <label class="wide">Business purpose<textarea name="business_purpose" rows="2" placeholder="Explain why this expense was necessary for work…" required></textarea></label>
+              <div class="form-section-label wide">RECEIPT EVIDENCE</div>
+              <label>Receipt status<select name="receipt_status"><option value="provided">Receipt supplied</option><option value="missing">No receipt supplied</option><option value="unreadable">Receipt supplied but unreadable</option></select></label>
+              <label>Receipt reference<input name="receipt_id" placeholder="Reference / attachment ID"></label>
+              <label>Receipt total<input name="receipt_total" type="number" min="0" step="0.01" placeholder="Enter total printed on receipt"></label>
+              <label class="check-field"><input name="duplicate_suspected" type="checkbox"> Possible duplicate flagged by system</label>
+              <p class="field-note wide">Receipt images are not uploaded or OCR-verified in this prototype. Receipt status and total are user-entered evidence metadata.</p>
+              <button class="primary-btn wide" type="submit" id="evaluate-expense-btn">Run policy checks and record decision →</button>
             </form>
             <p class="decision-disclaimer">This is a synthetic example policy, not your employer's policy. A decision is only as reliable as the policy and evidence supplied.</p>
           </article>
-          <article class="panel decision-result-panel"><div class="panel-head"><div><h2>Decision result</h2><p>Rule-by-rule explanation</p></div></div><div id="decision-result" class="empty">Submit an expense to see its policy evaluation.</div></article>
+          <article class="panel decision-result-panel"><div class="panel-head"><div><h2>Decision result</h2><p>Outcome, reason and checks applied to this claim.</p></div></div><div id="decision-result" class="empty">No claim evaluated yet. Complete the form to see the system's decision and the policy rules behind it.</div></article>
         </div>
-        <article class="panel table-panel decisions-table-panel"><div class="panel-head"><div><h2>Recent decisions</h2><p>Persisted evaluation history</p></div><button class="secondary-btn" id="decisions-refresh">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Expense</th><th>Decision</th><th>Policy version</th><th>Evaluated at</th><th></th></tr></thead><tbody id="decisions-table"><tr><td colspan="5" class="empty">No decisions yet</td></tr></tbody></table></div></article>
+        <article class="panel table-panel decisions-table-panel"><div class="panel-head"><div><h2>Decision register</h2><p>Every evaluation is recorded here, including exceptions and incomplete claims.</p></div><button class="secondary-btn" id="decisions-refresh">Refresh register</button></div><div class="table-wrap"><table><thead><tr><th>Expense</th><th>Decision</th><th>Policy version</th><th>Evaluated at</th><th></th></tr></thead><tbody id="decisions-table"><tr><td colspan="5" class="empty">No decisions yet</td></tr></tbody></table></div></article>
       </section>
       <section class="page hidden" id="transactions">
         <div class="page-heading"><div><div class="eyebrow">LEDGER EXPLORER</div><h1>Transactions</h1><p>Explore the underlying synthetic records. Selections here also filter the overview dashboard.</p></div></div>
