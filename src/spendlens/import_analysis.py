@@ -122,7 +122,10 @@ def _read_rows(filename: str, raw: bytes) -> tuple[list[str], list[tuple[int, di
                     raise ValueError("The Excel workbook expands beyond the 50 MB safety limit.")
         except BadZipFile as exc:
             raise ValueError("The XLSX file is not a valid Excel workbook.") from exc
-        workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        try:
+            workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+        except (BadZipFile, KeyError, OSError, ValueError) as exc:
+            raise ValueError("The XLSX file could not be opened. Re-export it as a valid .xlsx workbook.") from exc
         try:
             sheet = workbook.active
             iterator = sheet.iter_rows(values_only=True)
