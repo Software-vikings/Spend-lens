@@ -344,6 +344,12 @@ def test_policy_versions_are_immutable_admin_managed_and_used_by_evaluator(tmp_p
     assert decision.json()["policy_version"]=="1.0.1"
     assert decision.json()["policy_id"]==active["policy_id"]
 
+    audit=client.get("/v1/audit-events?entity_type=policy&entity_id="+active["policy_id"]+":1.0.1",
+      headers=admin)
+    assert audit.status_code==200
+    assert {item["event_type"] for item in audit.json()["items"]}=={"POLICY_CREATED","POLICY_ACTIVATED"}
+    assert client.get("/v1/audit-events",headers=viewer).status_code==403
+
 
 def test_policy_activation_requires_admin_and_unknown_version_is_404(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
