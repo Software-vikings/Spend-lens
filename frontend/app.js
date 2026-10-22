@@ -15,9 +15,9 @@ const choose=()=> $("file-input").click();
 function setFile(file){
  if(!file)return;
  const ext=file.name.split(".").pop().toLowerCase();
- if(!["csv","xlsx"].includes(ext)){message("Choose a CSV or XLSX file.","error");return;}
- if(file.size>maxBytes){message("The file is larger than 10 MB. Split it into smaller files.","error");return;}
- if(!file.size){message("The selected file is empty.","error");return;}
+ if(!["csv","xlsx"].includes(ext)){clearFile();message("Choose a CSV or XLSX file.","error");return;}
+ if(file.size>maxBytes){clearFile();message("The file is larger than 10 MB. Split it into smaller files.","error");return;}
+ if(!file.size){clearFile();message("The selected file is empty.","error");return;}
  state.file=file;$("file-name").textContent=file.name;$("file-size").textContent=bytes(file.size);
  $("selected-file").classList.remove("hidden");$("analyse-button").disabled=false;message("File ready for analysis.");
 }
