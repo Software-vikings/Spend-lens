@@ -73,6 +73,20 @@ def init_decisions(db_path: str | Path) -> None:
           created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_claim_evidence_claim ON claim_evidence(claim_id, created_at);
+        CREATE TABLE IF NOT EXISTS claim_resolution_events (
+          resolution_id TEXT PRIMARY KEY,
+          claim_id TEXT NOT NULL REFERENCES expense_claims(claim_id),
+          action TEXT NOT NULL CHECK(action IN ('REQUEST_INFORMATION','APPROVE','REJECT')),
+          previous_status TEXT NOT NULL,
+          new_status TEXT NOT NULL,
+          reviewer TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          evidence_note TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_claim_resolution_claim
+          ON claim_resolution_events(claim_id,created_at);
+
         """)
 
 
@@ -245,3 +259,44 @@ def get_claim(db_path: str | Path, claim_id: str) -> dict | None:
     item["submissions"] = [{**dict(row), "payload": json.loads(row["payload"])} for row in submissions]
     item["evidence"] = [{**dict(row), "metadata": json.loads(row["metadata"])} for row in evidence]
     return item
+
+def resolve_claim(db_path: str | Path, claim_id: str, action: str,
+                  reviewer: str, reason: str, evidence_note: str = "") -> dict:
+    allowed = {"REQUEST_INFORMATION", "APPROVE", "REJECT"}
+    if action not in allowed:
+        raise ValueError("Unsupported claim resolution action")
+    if not reviewer.strip() or not reason.strip():
+        raise ValueError("Reviewer and reason are required")
+    now = datetime.now(timezone.utc).isoformat()
+    statuses = {"REQUEST_INFORMATION": "AWAITING_INFORMATION",
+                "APPROVE": "HUMAN_APPROVED", "REJECT": "HUMAN_REJECTED"}
+    with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        claim = conn.execute("SELECT current_status FROM expense_claims WHERE claim_id=?",
+                             (claim_id,)).fetchone()
+        if claim is None:
+            raise LookupError("Expense claim not found")
+        if claim["current_status"] not in ("REVIEW", "INSUFFICIENT_DATA"):
+            raise ValueError("Only REVIEW or INSUFFICIENT_DATA claims can be resolved by an analyst")
+        previous = conn.execute(
+            "SELECT new_status FROM claim_resolution_events WHERE claim_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1",
+            (claim_id,)).fetchone()
+        previous_status = previous["new_status"] if previous else claim["current_status"]
+        new_status = statuses[action]
+        resolution_id = str(uuid.uuid4())
+        conn.execute(
+            "INSERT INTO claim_resolution_events(resolution_id,claim_id,action,previous_status,new_status,reviewer,reason,evidence_note,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+            (resolution_id,claim_id,action,previous_status,new_status,reviewer.strip(),
+             reason.strip(),evidence_note.strip(),now))
+    return {"resolution_id":resolution_id,"claim_id":claim_id,"action":action,
+            "previous_status":previous_status,"resolution_status":new_status,
+            "reviewer":reviewer.strip(),"reason":reason.strip(),
+            "evidence_note":evidence_note.strip(),"created_at":now}
+
+
+def list_claim_resolutions(db_path: str | Path, claim_id: str) -> list[dict]:
+    with connect(db_path) as conn:
+        rows=conn.execute(
+            "SELECT resolution_id,action,previous_status,new_status,reviewer,reason,evidence_note,created_at FROM claim_resolution_events WHERE claim_id=? ORDER BY created_at,rowid",
+            (claim_id,)).fetchall()
+    return [dict(row) for row in rows]
