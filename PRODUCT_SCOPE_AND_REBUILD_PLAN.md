@@ -111,3 +111,19 @@ Credit requires implemented code and relevant passing tests. Plans/stubs earn no
 ## Definition of done
 
 A synthetic expense can be submitted, automatically evaluated against a versioned policy, receive a defensible outcome and rule-level explanation, persist its decision/audit history, and appear consistently in the dashboard. A reviewer can click from an aggregate to the exact claim and see why the system decided as it did. SpendLens remains a synthetic prototype, not a production financial control system or proof of real-world fraud detection.
+
+
+## Execution status — 22 October 2026
+
+| Phase | Status | Evidence / remaining gate |
+|---|---|---|
+| Phase 0 — Baseline and documentation | Complete on rebuild branch | Product audit, target outcomes, acceptance criteria, architecture, scoring rubric, README correction and private-log ignore rule committed. |
+| Phase 1 — Claim/evidence domain and synthetic policy | In progress | Versioned synthetic example policy exists. A first evaluation input contract is implemented, but a persisted first-class claim/evidence domain model and expanded synthetic claim fixtures remain. |
+| Phase 2 — Decision engine | First vertical slice implemented; verification pending | Deterministic evaluator, four outcomes, rule explanations, SQLite decision persistence and authenticated API routes added. Draft PR #3. GitHub Actions has not yet supplied a verified green result; do not count this as a completed phase. |
+| Phase 3 — API/workflow | Partial | Evaluate/list/detail endpoints exist. Submission lifecycle, policy management, overrides, re-evaluation and complete audit lifecycle remain. |
+| Phase 4 — Dashboard rebuild | Not started | Existing monolithic UI remains; shared-state architecture and browser-level cross-filter/drill-through are still required. |
+| Phase 5 — Validation/release | Not started | Automated workflow and browser walkthrough must pass; no new green CI or manual browser evidence is claimed. |
+
+**Current measured score:** retain the 24/100 baseline until the new evaluator/API tests pass in hosted CI and the rubric can award evidence-based credit. The 24/100 figure is the pre-implementation baseline, not a claim that this branch's unverified work has been accepted.
+
+**Current draft implementation:** [PR #3 — Rebuild SpendLens around policy-based expense decisions](https://github.com/Software-vikings/Spend-lens/pull/3). The branch is not merged into the default branch. The frontend/dashboard rebuild is not included in this first vertical slice.
