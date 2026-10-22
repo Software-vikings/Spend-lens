@@ -127,3 +127,6 @@ The product acceptance criteria and rebuild sequence are now defined in [PRODUCT
 - No new completion percentage is awarded yet. Retain 24/100 as the pre-implementation baseline until CI and rubric evidence are available.
 - Private prompt/decision/change history is not stored in this public repository. The .spendlens-private/ directory is ignored by Git. The private worklog is maintained separately.
 - Draft PR: https://github.com/Software-vikings/Spend-lens/pull/3
+
+
+- Initial decision workbench added in the rebuild branch: synthetic expense form, API evaluation, persisted decision queue and rule-by-rule explanation. This is not a full dashboard rebuild; the old monolithic UI state architecture and manual browser verification remain open.
