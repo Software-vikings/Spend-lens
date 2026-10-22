@@ -204,7 +204,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
                 ORDER BY spend DESC""",params).fetchall()
             categories=c.execute(f"""SELECT category,ROUND(SUM(amount),2) spend,
                 COUNT(*) transaction_count FROM transactions{where} GROUP BY category
-                ORDER BY spend DESC LIMIT 8""",params).fetchall()
+                ORDER BY spend DESC""",params).fetchall()
         return {"monthly":[dict(r) for r in monthly],
                 "departments":[dict(r) for r in departments],
                 "categories":[dict(r) for r in categories],"currency":"EUR",
