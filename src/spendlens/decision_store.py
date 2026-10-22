@@ -222,9 +222,6 @@ def list_decisions(db_path: str | Path, outcome: str | None = None,
             "FROM expense_decisions" + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
             params + [limit, offset]).fetchall()
     return {"total": total, "limit": limit, "offset": offset,
-            "metrics": {"assigned": aggregate["assigned_count"] or 0,
-                        "unassigned": aggregate["unassigned_count"] or 0,
-                        "overdue": aggregate["overdue_count"] or 0},
             "items": [dict(row) for row in rows]}
 
 
@@ -412,4 +409,8 @@ def list_exception_queue(db_path: str | Path, status: str | None = None,
           CASE WHEN a.due_at IS NOT NULL AND a.due_at < ? THEN 1 ELSE 0 END overdue
         """ + joins + where + " ORDER BY CASE a.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, a.due_at IS NULL, a.due_at, c.created_at LIMIT ? OFFSET ?",
           [now] + params + [limit, offset]).fetchall()
-    return {"total": total, "limit": limit, "offset": offset, "items": [dict(row) for row in rows]}
+    return {"total": total, "limit": limit, "offset": offset,
+            "metrics": {"assigned": aggregate["assigned_count"] or 0,
+                        "unassigned": aggregate["unassigned_count"] or 0,
+                        "overdue": aggregate["overdue_count"] or 0},
+            "items": [dict(row) for row in rows]}
