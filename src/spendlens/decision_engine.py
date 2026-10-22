@@ -41,20 +41,40 @@ def validate_policy(policy: dict) -> None:
     missing = required - policy.keys()
     if missing:
         raise ValueError(f"Policy missing fields: {', '.join(sorted(missing))}")
-    if not str(policy["policy_id"]).strip() or not str(policy["version"]).strip():
-        raise ValueError("Policy ID and version must be non-empty")
-    if len(str(policy["currency"])) != 3:
-        raise ValueError("Policy currency must be a three-letter code")
-    if not isinstance(policy["eligible_categories"], list) or not isinstance(policy["blocked_categories"], list):
-        raise ValueError("Policy category lists must be arrays")
+    if not isinstance(policy["policy_id"], str) or not policy["policy_id"].strip():
+        raise ValueError("Policy ID must be a non-empty string")
+    if not isinstance(policy["version"], str) or not policy["version"].strip():
+        raise ValueError("Policy version must be a non-empty string")
+    currency = policy["currency"]
+    if not isinstance(currency, str) or len(currency) != 3 or not currency.isalpha() or not currency.isupper():
+        raise ValueError("Policy currency must be a three-letter uppercase code")
+    for field in ("eligible_categories", "blocked_categories", "receipt_required_categories"):
+        values = policy[field]
+        if not isinstance(values, list) or any(not isinstance(x, str) or not x.strip() for x in values):
+            raise ValueError(f"{field} must be an array of non-empty category names")
+        if len(values) != len(set(values)):
+            raise ValueError(f"{field} cannot contain duplicate categories")
+    eligible = set(policy["eligible_categories"])
+    blocked = set(policy["blocked_categories"])
+    receipt_required = set(policy["receipt_required_categories"])
+    if eligible & blocked:
+        raise ValueError("A category cannot be both eligible and blocked")
+    if not receipt_required <= eligible:
+        raise ValueError("Receipt-required categories must be eligible categories")
     if not isinstance(policy["category_limits"], dict):
         raise ValueError("category_limits must be an object")
     for category, limit in policy["category_limits"].items():
-        if _amount(limit) is None:
-            raise ValueError(f"Invalid amount limit for category {category}")
+        if category not in eligible:
+            raise ValueError(f"Category limit refers to non-eligible category: {category}")
+        amount = _amount(limit)
+        if amount is None or amount <= 0:
+            raise ValueError(f"Invalid positive amount limit for category {category}")
     action = policy.get("over_limit_action", "REVIEW")
     if action not in {"REJECT", "REVIEW"}:
         raise ValueError("over_limit_action must be REJECT or REVIEW")
+    for field in ("require_business_purpose",):
+        if field in policy and not isinstance(policy[field], bool):
+            raise ValueError(f"{field} must be a boolean")
 
 
 def evaluate_expense(expense: dict, policy: dict) -> dict:
