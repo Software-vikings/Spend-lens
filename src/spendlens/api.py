@@ -12,12 +12,18 @@ from fastapi import FastAPI, HTTPException, Query, Header, Depends, Request
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
+from .decision_engine import evaluate_expense
+from .decision_store import init_decisions, save_decision, list_decisions, get_decision
 
 logger = logging.getLogger("spendlens.api")
 ROOT = Path(__file__).resolve().parents[2]
 DB_PATH = Path(os.getenv("SPENDLENS_DB", ROOT/"data"/"spendlens.db"))
 ReviewStatus = Literal["new","under_review","confirmed","dismissed","resolved"]
 ROLE_LEVEL = {"viewer":1,"analyst":2,"admin":3}
+
+class ExpenseEvaluationRequest(BaseModel):
+    expense: dict
+
 
 class ReviewUpdate(BaseModel):
     status: ReviewStatus
@@ -99,6 +105,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         if not db_path.exists():
             raise HTTPException(503,"SpendLens database not found. Run the pipeline first.")
         init_phase4(db_path)
+        init_decisions(db_path)
         return connect(db_path)
 
     def transaction_filters(month: str | None, department: str | None,
@@ -189,6 +196,34 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
             rows=c.execute("SELECT transaction_id,transaction_date,employee_id,department,merchant_id,merchant_name,category,amount,currency,payment_method FROM transactions"+where+" ORDER BY transaction_date DESC,transaction_id LIMIT ? OFFSET ?",params+[limit,offset]).fetchall()
         return {"total":total,"limit":limit,"offset":offset,"items":[dict(r) for r in rows],
                 "active_filters":{"month":month,"department":department,"category":category}}
+
+    @app.post("/v1/expenses/evaluate")
+    def evaluate_expense_route(body: ExpenseEvaluationRequest,
+                               _:str=Depends(require_role("analyst"))):
+        policy_path = ROOT / "policies" / "demo_policy.json"
+        if not policy_path.exists():
+            raise HTTPException(503, "Configured demo policy is missing")
+        try:
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            evaluation = evaluate_expense(body.expense, policy)
+            return save_decision(db_path, body.expense, evaluation)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+
+    @app.get("/v1/decisions")
+    def decisions(outcome:Literal["APPROVE","REJECT","REVIEW","INSUFFICIENT_DATA"]|None=None,
+                  limit:int=Query(100,ge=1,le=500),offset:int=Query(0,ge=0),
+                  _:str=Depends(require_role("viewer"))):
+        db()
+        return list_decisions(db_path, outcome, limit, offset)
+
+    @app.get("/v1/decisions/{decision_id}")
+    def decision_detail(decision_id:str,_:str=Depends(require_role("viewer"))):
+        db()
+        item=get_decision(db_path,decision_id)
+        if item is None:
+            raise HTTPException(404,"Decision not found")
+        return item
 
     @app.get("/v1/findings")
     def findings(status:ReviewStatus|None=None,finding_type:str|None=None,
