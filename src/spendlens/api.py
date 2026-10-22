@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
 from .decision_engine import evaluate_expense
 from .policy_store import init_policy_registry, create_policy_version, activate_policy_version, get_active_policy, list_policy_versions, get_policy_version
-from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate, resolve_claim, assign_claim, list_exception_queue, record_audit_event, list_audit_events
+from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate, resolve_claim, assign_claim, list_exception_queue, record_audit_event, list_audit_events, _insert_audit_event
 
 logger = logging.getLogger("spendlens.api")
 ROOT = Path(__file__).resolve().parents[2]
@@ -419,6 +419,9 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
               (body.status,body.reviewer,body.note.strip(),finding_id))
             c.execute("""INSERT INTO finding_events(finding_id,event_at,old_status,new_status,reviewer,note)
               VALUES(?,?,?,?,?,?)""",(finding_id,now,old["review_status"],body.status,body.reviewer,body.note.strip()))
+            _insert_audit_event(c, "FINDING_REVIEW_UPDATED", "finding", finding_id, body.reviewer,
+                {"previous_status": old["review_status"], "new_status": body.status,
+                 "note": body.note.strip()}, now)
         return {"finding_id":finding_id,"previous_status":old["review_status"],
           "review_status":body.status,"reviewer":body.reviewer,"updated_at":now}
     from fastapi.staticfiles import StaticFiles
