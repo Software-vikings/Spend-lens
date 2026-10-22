@@ -74,11 +74,14 @@ Open http://127.0.0.1:8000 and enter the API key. The dashboard stores it in the
 - `GET /v1/summary` — spend and finding summary; accepts `month`, `department` and `category` filters
 - `GET /v1/analytics/overview` — monthly, department and category aggregates; accepts the same filters
 - `GET /v1/transactions` — searchable and paginated transactions; accepts the same filters
+- `POST /v1/expenses/evaluate` — analyst-only evaluation against the versioned synthetic demo policy; persists the decision
+- `GET /v1/decisions` — persisted decision history, filterable by outcome
+- `GET /v1/decisions/{decision_id}` — decision, input and rule-level explanation
 - `GET /v1/findings` — findings queue
 - `GET /v1/findings/{finding_id}` — finding detail and review history
 - `PATCH /v1/findings/{finding_id}/review` — analyst review update
 
-All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role can update review state. The admin role currently has the same application permissions as analyst. The current cross-filtering applies to transaction spend, analytics and the transaction ledger. Finding counts and the findings list remain workspace-wide until every finding type has a reliable transaction-level relationship.
+All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role can evaluate expenses and update finding review state. Expense evaluation is an initial vertical slice using the example policy; there is not yet a policy-management UI or complete claim lifecycle. The admin role currently has the same application permissions as analyst. The current cross-filtering applies to transaction spend, analytics and the transaction ledger. Finding counts and the findings list remain workspace-wide until every finding type has a reliable transaction-level relationship.
 
 ## Tests and CI
 
