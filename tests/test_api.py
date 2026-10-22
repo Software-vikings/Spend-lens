@@ -304,7 +304,7 @@ def test_claim_register_is_paginated_and_filterable(tmp_path):
     headers={"X-API-Key":ANALYST}
     for index in range(3):
         expense={"expense_id":f"CLAIM-LIST-{index}","employee_id":"EMP-LIST",
-          "merchant_name":"Office Depot","department":"Operations","amount":"25.00",
+          "merchant_name":f"Office Depot {index}","department":"Operations","amount":"25.00",
           "currency":"EUR","category":"Office Supplies","transaction_date":"2026-05-19",
           "business_purpose":"Stationery purchase",
           "receipt":{"provided":True,"readable":True,"receipt_id":f"RCPT-{index}","total":"25.00"}}
