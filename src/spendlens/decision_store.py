@@ -1,6 +1,7 @@
 """Persistence and audit history for deterministic expense decisions."""
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -27,6 +28,12 @@ def init_decisions(db_path: str | Path) -> None:
         CREATE INDEX IF NOT EXISTS idx_expense_decisions_outcome ON expense_decisions(outcome);
         CREATE INDEX IF NOT EXISTS idx_expense_decisions_expense ON expense_decisions(expense_id, created_at);
         """)
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(expense_decisions)")}
+        if "idempotency_key" not in columns:
+            conn.execute("ALTER TABLE expense_decisions ADD COLUMN idempotency_key TEXT")
+        if "request_hash" not in columns:
+            conn.execute("ALTER TABLE expense_decisions ADD COLUMN request_hash TEXT")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_expense_decisions_idempotency ON expense_decisions(idempotency_key) WHERE idempotency_key IS NOT NULL")
 
 
 
@@ -56,7 +63,15 @@ def find_potential_duplicate(db_path: str | Path, expense: dict) -> dict | None:
     return None
 
 
-def save_decision(db_path: str | Path, expense: dict, evaluation: dict) -> dict:
+def save_decision(db_path: str | Path, expense: dict, evaluation: dict,\n                  idempotency_key: str | None = None) -> dict:
+    request_hash = hashlib.sha256(json.dumps({"expense": expense, "evaluation": evaluation}, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    if idempotency_key:
+        with connect(db_path) as conn:
+            existing = conn.execute("SELECT decision_id,request_hash FROM expense_decisions WHERE idempotency_key=?", (idempotency_key,)).fetchone()
+        if existing:
+            if existing["request_hash"] != request_hash:
+                raise ValueError("Idempotency key was already used for a different expense request")
+            return get_decision(db_path, existing["decision_id"])
     decision = {
         "decision_id": str(uuid.uuid4()),
         "expense_id": str(evaluation["expense_id"]),
@@ -72,12 +87,12 @@ def save_decision(db_path: str | Path, expense: dict, evaluation: dict) -> dict:
         conn.execute("""
           INSERT INTO expense_decisions
           (decision_id,expense_id,outcome,policy_id,policy_version,engine_version,
-           created_at,expense_payload,evaluation_payload)
-          VALUES(?,?,?,?,?,?,?,?,?)
+           created_at,expense_payload,evaluation_payload,idempotency_key,request_hash)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?)
         """, (decision["decision_id"], decision["expense_id"], decision["outcome"],
               decision["policy_id"], decision["policy_version"], decision["engine_version"],
               decision["created_at"], json.dumps(expense, sort_keys=True),
-              json.dumps(evaluation, sort_keys=True)))
+              json.dumps(evaluation, sort_keys=True), idempotency_key, request_hash))
     return decision
 
 
