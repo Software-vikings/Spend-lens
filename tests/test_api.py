@@ -297,3 +297,21 @@ def test_claim_resubmission_preserves_prior_decision_history(tmp_path):
     assert claim["latest_decision_id"] == second.json()["decision_id"]
     assert claim["amount"] == "75.00"
     assert len(claim["evidence"]) == 2
+
+
+def test_claim_register_is_paginated_and_filterable(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":ANALYST}
+    for index in range(3):
+        expense={"expense_id":f"CLAIM-LIST-{index}","employee_id":"EMP-LIST",
+          "merchant_name":"Office Depot","department":"Operations","amount":"25.00",
+          "currency":"EUR","category":"Office Supplies","transaction_date":"2026-05-19",
+          "business_purpose":"Stationery purchase",
+          "receipt":{"provided":True,"readable":True,"receipt_id":f"RCPT-{index}","total":"25.00"}}
+        assert client.post("/v1/expenses/evaluate",headers=headers,json={"expense":expense}).status_code == 200
+    page=client.get("/v1/claims?limit=2&offset=1",headers={"X-API-Key":VIEWER})
+    assert page.status_code == 200
+    assert page.json()["total"] == 3
+    assert len(page.json()["items"]) == 2
+    assert client.get("/v1/claims?status=APPROVE",headers={"X-API-Key":VIEWER}).json()["total"] == 3
+    assert client.get("/v1/claims").status_code == 401
