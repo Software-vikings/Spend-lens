@@ -168,8 +168,12 @@
     $("transaction-page-label").textContent=`Showing ${state.total?state.page*state.pageSize+1:0}–${Math.min((state.page+1)*state.pageSize,state.total)} of ${number(state.total)}`;
     $("prev-page").disabled=state.page===0;$("next-page").disabled=(state.page+1)*state.pageSize>=state.total;
   };
-  const openTransaction = tx => {
+  const openTransaction = async tx => {
     if(!tx)return;
+    let context;
+    try { context=await api(`/v1/transactions/${encodeURIComponent(tx.transaction_id)}`); }
+    catch(e){toast(e.message);return;}
+    const linked=context.related_findings||[];
     const fields=[
       ["Transaction reference",tx.transaction_id],["Date",tx.transaction_date],
       ["Merchant",tx.merchant_name],["Merchant reference",tx.merchant_id],
@@ -177,8 +181,10 @@
       ["Category",tx.category],["Payment method",tx.payment_method],
       ["Currency",tx.currency]
     ];
-    $("finding-detail").innerHTML=`<div class="eyebrow">LEDGER RECORD</div><h2>${esc(tx.merchant_name)}</h2><div class="detail-type">Transaction ${esc(tx.transaction_id)}</div><div class="detail-amount">${money(tx.amount,tx.currency)}</div><div class="detail-section"><h3>Transaction information</h3><div class="detail-grid">${fields.map(([k,v])=>`<div class="detail-field"><small>${esc(k)}</small><b>${esc(v??"Not recorded")}</b></div>`).join("")}</div></div><div class="detail-section"><h3>What this record means</h3><p class="decision-summary">This is a synthetic card/expense transaction record. It is not, by itself, an employee reimbursement claim and does not contain an attached receipt or approval decision.</p></div><div class="detail-section"><h3>Explore related spend</h3><button class="secondary-btn" id="transaction-context-filter">Filter dashboard to ${esc(tx.department)}</button></div>`;
+    $("finding-detail").innerHTML=`<div class="eyebrow">LEDGER RECORD</div><h2>${esc(tx.merchant_name)}</h2><div class="detail-type">Transaction ${esc(tx.transaction_id)}</div><div class="detail-amount">${money(tx.amount,tx.currency)}</div><div class="detail-section"><h3>Transaction information</h3><div class="detail-grid">${fields.map(([k,v])=>`<div class="detail-field"><small>${esc(k)}</small><b>${esc(v??"Not recorded")}</b></div>`).join("")}</div></div><div class="detail-section"><h3>What this record means</h3><p class="decision-summary">This is a synthetic card/expense transaction record. It is not, by itself, an employee reimbursement claim and does not contain an attached receipt or approval decision.</p></div><div class="detail-section"><h3>Related findings <span class="subtle-tag">${linked.length}</span></h3>${linked.length?linked.map(f=>`<div class="finding-line"><div><div class="finding-title">${esc(f.title)}</div><div class="finding-meta">${esc(f.finding_type.replaceAll("_"," "))} · ${esc(f.finding_id.slice(0,12))}</div></div><div><span class="status ${esc(f.review_status)}">${esc(f.review_status.replaceAll("_"," "))}</span><div style="margin-top:6px"><button class="secondary-btn small" data-linked-finding="${esc(f.finding_id)}">Open finding →</button></div></div></div>`).join(""):'<div class="finding-meta">No findings are explicitly linked to this transaction.</div>'}<p class="field-note">Only exact transaction-ID relationships are shown. Similar amounts, merchants or dates are not treated as proof of a relationship.</p></div><div class="detail-section"><h3>Explore related spend</h3><button class="secondary-btn" id="transaction-context-filter">Filter dashboard to ${esc(tx.department)}</button></div>`;
+    $("finding-detail").innerHTML=`<div class="eyebrow">LEDGER RECORD</div><h2>${esc(tx.merchant_name)}</h2><div class="detail-type">Transaction ${esc(tx.transaction_id)}</div><div class="detail-amount">${money(tx.amount,tx.currency)}</div><div class="detail-section"><h3>Transaction information</h3><div class="detail-grid">${fields.map(([k,v])=>`<div class="detail-field"><small>${esc(k)}</small><b>${esc(v??"Not recorded")}</b></div>`).join("")}</div></div><div class="detail-section"><h3>What this record means</h3><p class="decision-summary">This is a synthetic card/expense transaction record. It is not, by itself, an employee reimbursement claim and does not contain an attached receipt or approval decision.</p></div>${neu}`;
     $("drawer-backdrop").classList.remove("hidden");
+    $("finding-detail").querySelectorAll("[data-linked-finding]").forEach(el=>el.addEventListener("click",()=>openFinding(el.dataset.linkedFinding)));
     $("transaction-context-filter").addEventListener("click",()=>{ $("drawer-backdrop").classList.add("hidden");state.filters.department=tx.department;state.page=0;refreshAll().then(()=>showSection("overview"));});
   };
   const openFinding = async id => {
