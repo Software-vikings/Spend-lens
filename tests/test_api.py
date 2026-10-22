@@ -97,3 +97,51 @@ def test_transaction_search_is_server_side_and_paged(tmp_path):
     response=client.get("/v1/transactions?q=TX-000001&limit=10",headers={"X-API-Key":VIEWER})
     assert response.status_code==200
     assert response.json()["total"] <= 1
+
+
+def test_dashboard_cross_filters_match_transaction_ledger(tmp_path):
+    db,n=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":VIEWER}
+    all_rows=client.get("/v1/transactions?limit=500",headers=headers).json()["items"]
+    selected=all_rows[0]
+    month=selected["transaction_date"][:7]
+    department=selected["department"]
+
+    ledger=client.get(
+      f"/v1/transactions?limit=500&month={month}&department={department}",
+      headers=headers
+    ).json()
+    summary=client.get(
+      f"/v1/summary?month={month}&department={department}",headers=headers
+    ).json()
+    overview=client.get(
+      f"/v1/analytics/overview?month={month}&department={department}",headers=headers
+    ).json()
+
+    assert ledger["total"] > 0
+    assert all(row["transaction_date"].startswith(month) for row in ledger["items"])
+    assert all(row["department"] == department for row in ledger["items"])
+    assert summary["transaction_count"] == ledger["total"]
+    assert summary["total_spend"] == round(sum(row["amount"] for row in ledger["items"]),2)
+    assert len(overview["monthly"]) == 1
+    assert overview["monthly"][0]["month"] == month
+    assert all(row["department"] == department for row in overview["departments"])
+
+
+def test_dashboard_filters_support_category_and_reject_invalid_month(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":VIEWER}
+    base=client.get("/v1/transactions?limit=500",headers=headers).json()["items"]
+    category=base[0]["category"]
+    filtered=client.get(
+      f"/v1/transactions?limit=500&category={category}",headers=headers
+    ).json()
+    summary=client.get(
+      f"/v1/summary?category={category}",headers=headers
+    ).json()
+    assert filtered["total"] > 0
+    assert all(row["category"] == category for row in filtered["items"])
+    assert summary["transaction_count"] == filtered["total"]
+    assert client.get(
+      "/v1/transactions?month=not-a-month",headers=headers
+    ).status_code == 422
