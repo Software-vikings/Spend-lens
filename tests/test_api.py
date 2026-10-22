@@ -145,3 +145,36 @@ def test_dashboard_filters_support_category_and_reject_invalid_month(tmp_path):
     assert client.get(
       "/v1/transactions?month=not-a-month",headers=headers
     ).status_code == 422
+
+
+def test_expense_evaluation_is_persisted_and_retrievable(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    body={"expense":{
+      "expense_id":"EXP-API-001","amount":"85.00","currency":"EUR",
+      "category":"Meals","transaction_date":"2026-05-14",
+      "business_purpose":"Project working lunch",
+      "receipt":{"provided":True,"readable":True,"receipt_id":"R-API-001","total":"85.00"}
+    }}
+    denied=client.post("/v1/expenses/evaluate",json=body,headers={"X-API-Key":VIEWER})
+    assert denied.status_code==403
+    response=client.post("/v1/expenses/evaluate",json=body,headers={"X-API-Key":ANALYST})
+    assert response.status_code==200
+    saved=response.json()
+    assert saved["outcome"]=="APPROVE"
+    listing=client.get("/v1/decisions?outcome=APPROVE",headers={"X-API-Key":VIEWER})
+    assert listing.status_code==200 and listing.json()["total"]==1
+    detail=client.get(f"/v1/decisions/{saved['decision_id']}",headers={"X-API-Key":VIEWER})
+    assert detail.status_code==200
+    assert detail.json()["evaluation"]["policy_version"]=="1.0.0"
+
+
+def test_expense_evaluation_missing_evidence_is_not_approved(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    body={"expense":{
+      "expense_id":"EXP-API-002","amount":"85.00","currency":"EUR",
+      "category":"Meals","transaction_date":"2026-05-14",
+      "business_purpose":"Project working lunch","receipt":{"provided":False}
+    }}
+    response=client.post("/v1/expenses/evaluate",json=body,headers={"X-API-Key":ANALYST})
+    assert response.status_code==200
+    assert response.json()["outcome"]=="INSUFFICIENT_DATA"
