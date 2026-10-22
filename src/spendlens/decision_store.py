@@ -298,7 +298,8 @@ def get_claim(db_path: str | Path, claim_id: str) -> dict | None:
     return item
 
 def resolve_claim(db_path: str | Path, claim_id: str, action: str,
-                  reviewer: str, reason: str, evidence_note: str = "") -> dict:
+                  reviewer: str, reason: str, evidence_note: str = "",
+                  audit_actor: str | None = None) -> dict:
     allowed = {"REQUEST_INFORMATION", "APPROVE", "REJECT"}
     if action not in allowed:
         raise ValueError("Unsupported claim resolution action")
@@ -327,6 +328,10 @@ def resolve_claim(db_path: str | Path, claim_id: str, action: str,
             "INSERT INTO claim_resolution_events(resolution_id,claim_id,action,previous_status,new_status,reviewer,reason,evidence_note,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
             (resolution_id,claim_id,action,previous_status,new_status,reviewer.strip(),
              reason.strip(),evidence_note.strip(),now))
+        if audit_actor is not None:
+            _insert_audit_event(conn, "CLAIM_RESOLVED", "claim", claim_id, audit_actor,
+                {"action": action, "resolution_status": new_status,
+                 "reviewer": reviewer.strip(), "reason": reason.strip()}, now)
     return {"resolution_id":resolution_id,"claim_id":claim_id,"action":action,
             "previous_status":previous_status,"resolution_status":new_status,
             "reviewer":reviewer.strip(),"reason":reason.strip(),
@@ -342,7 +347,8 @@ def list_claim_resolutions(db_path: str | Path, claim_id: str) -> list[dict]:
 
 def assign_claim(db_path: str | Path, claim_id: str, assignee: str,
                  assigned_by: str, priority: str = "NORMAL",
-                 sla_hours: int = 24, note: str = "") -> dict:
+                 sla_hours: int = 24, note: str = "",
+                 audit_actor: str | None = None) -> dict:
     priority = priority.upper()
     if priority not in {"LOW", "NORMAL", "HIGH", "URGENT"}:
         raise ValueError("Priority must be LOW, NORMAL, HIGH or URGENT")
@@ -371,6 +377,10 @@ def assign_claim(db_path: str | Path, claim_id: str, assignee: str,
           (assignment_id,claim_id,assignee,priority,sla_hours,due_at,assigned_by,note,created_at)
           VALUES(?,?,?,?,?,?,?,?,?)""",
           tuple(event[k] for k in ("assignment_id","claim_id","assignee","priority","sla_hours","due_at","assigned_by","note","created_at")))
+        if audit_actor is not None:
+            _insert_audit_event(conn, "CLAIM_ASSIGNED", "claim", claim_id, audit_actor,
+                {"assignee": event["assignee"], "priority": priority,
+                 "sla_hours": int(sla_hours)}, event["created_at"])
     return event
 
 
@@ -434,23 +444,29 @@ def list_exception_queue(db_path: str | Path, status: str | None = None,
             "items": [dict(row) for row in rows]}
 
 
-def record_audit_event(db_path: str | Path, event_type: str, entity_type: str,
-                       entity_id: str, actor: str, details: dict | None = None) -> dict:
-    """Append an operational audit event; existing events are never updated."""
+def _insert_audit_event(conn: sqlite3.Connection, event_type: str, entity_type: str,
+                        entity_id: str, actor: str, details: dict | None = None,
+                        created_at: str | None = None) -> dict:
+    """Insert an audit event using the caller's transaction."""
     if not all(str(value).strip() for value in (event_type, entity_type, entity_id, actor)):
         raise ValueError("Audit event type, entity type, entity ID and actor are required")
     event = {"event_id": str(uuid.uuid4()), "event_type": event_type,
              "entity_type": entity_type, "entity_id": entity_id,
              "actor": actor.strip(), "details": details or {},
-             "created_at": datetime.now(timezone.utc).isoformat()}
-    with connect(db_path) as conn:
-        conn.execute("""INSERT INTO audit_events
-          (event_id,event_type,entity_type,entity_id,actor,details,created_at)
-          VALUES(?,?,?,?,?,?,?)""",
-          (event["event_id"], event_type, entity_type, entity_id, actor.strip(),
-           json.dumps(event["details"], sort_keys=True), event["created_at"]))
+             "created_at": created_at or datetime.now(timezone.utc).isoformat()}
+    conn.execute("""INSERT INTO audit_events
+      (event_id,event_type,entity_type,entity_id,actor,details,created_at)
+      VALUES(?,?,?,?,?,?,?)""",
+      (event["event_id"], event_type, entity_type, entity_id, actor.strip(),
+       json.dumps(event["details"], sort_keys=True), event["created_at"]))
     return event
 
+
+def record_audit_event(db_path: str | Path, event_type: str, entity_type: str,
+                       entity_id: str, actor: str, details: dict | None = None) -> dict:
+    """Append an operational audit event; existing events are never updated."""
+    with connect(db_path) as conn:
+        return _insert_audit_event(conn, event_type, entity_type, entity_id, actor, details)
 
 def list_audit_events(db_path: str | Path, entity_type: str | None = None,
                       entity_id: str | None = None, event_type: str | None = None,
