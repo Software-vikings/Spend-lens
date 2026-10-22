@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101b2d">
+  <title>SpendLens — Spend Intelligence</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">S</div><div><b>spendlens</b><small>SPEND INTELLIGENCE</small></div></div>
+      <div class="workspace"><span class="dot"></span> Demo workspace <span class="chevron">⌄</span></div>
+      <nav><span class="nav-label">WORKSPACE</span><a class="nav-item active" href="#overview">▦ <span>Overview</span></a><a class="nav-item" href="#findings">◎ <span>Findings</span><span class="nav-count" id="nav-count">—</span></a><a class="nav-item" href="#transactions">▤ <span>Transactions</span></a></nav>
+      <div class="sidebar-bottom"><div class="secure-icon">⌑</div><b>Human-led decisions</b><p>Signals support review. They do not determine fraud or policy violations.</p><div class="api-status"><span class="dot red" id="connection-dot"></span><span id="connection-label">Not connected</span></div></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><div class="crumb">Workspace <span>/</span> <b id="crumb-title">Overview</b></div><div class="top-actions"><span class="demo-pill">SYNTHETIC DATA</span><button class="icon-btn" id="refresh-btn" title="Refresh data">↻</button><div class="avatar">SA</div></div></header>
+      <section class="page" id="overview">
+        <div class="page-heading"><div><div class="eyebrow">MONDAY, FINANCIAL INTELLIGENCE</div><h1>Spend overview</h1><p>A clear view of where company money goes — and what deserves a closer look.</p></div><div class="period-tag">All available data <span>⌄</span></div></div>
+        <div class="metrics">
+          <article class="metric"><div class="metric-top"><span>Total spend</span><span class="metric-icon">€</span></div><strong id="total-spend">—</strong><small>Across recorded transactions</small></article>
+          <article class="metric"><div class="metric-top"><span>Transactions</span><span class="metric-icon">↗</span></div><strong id="transaction-count">—</strong><small>Processed records</small></article>
+          <article class="metric"><div class="metric-top"><span>Open findings</span><span class="metric-icon amber">◎</span></div><strong id="open-findings">—</strong><small>Awaiting analyst action</small></article>
+          <article class="metric"><div class="metric-top"><span>Finding types</span><span class="metric-icon">⌘</span></div><strong id="finding-types">—</strong><small>Distinct signal categories</small></article>
+        </div>
+        <div class="grid-main">
+          <article class="panel spend-panel"><div class="panel-head"><div><h2>Spend over time</h2><p>Monthly transaction value</p></div><span class="subtle-tag">EUR</span></div><div id="trend-chart" class="trend-chart"><div class="empty">Connect to load analytics</div></div></article>
+          <article class="panel"><div class="panel-head"><div><h2>Spend by department</h2><p>Where spend is concentrated</p></div></div><div id="department-chart" class="bar-list"></div></article>
+        </div>
+        <div class="grid-bottom">
+          <article class="panel"><div class="panel-head"><div><h2>Latest findings</h2><p>Signals that may need attention</p></div><a href="#findings" class="text-link">View all →</a></div><div id="latest-findings" class="finding-list"><div class="empty">No data loaded</div></div></article>
+          <article class="panel"><div class="panel-head"><div><h2>Top spend categories</h2><p>By recorded transaction value</p></div></div><div id="category-list" class="category-list"></div></article>
+        </div>
+      </section>
+      <section class="page hidden" id="findings">
+        <div class="page-heading"><div><div class="eyebrow">REVIEW QUEUE</div><h1>Findings</h1><p>Investigate unusual patterns with supporting transaction context.</p></div></div>
+        <div class="toolbar"><input id="finding-search" placeholder="Search merchant, type or finding ID"><select id="finding-status"><option value="">All statuses</option><option>new</option><option>under_review</option><option>confirmed</option><option>dismissed</option><option>resolved</option></select><button class="secondary-btn" id="findings-refresh">Refresh findings</button></div>
+        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Finding</th><th>Merchant / signal</th><th>Amount</th><th>Occurrences</th><th>Status</th><th></th></tr></thead><tbody id="findings-table"><tr><td colspan="6" class="empty">Connect to load findings</td></tr></tbody></table></div></div>
+      </section>
+      <section class="page hidden" id="transactions">
+        <div class="page-heading"><div><div class="eyebrow">LEDGER EXPLORER</div><h1>Transactions</h1><p>Explore the underlying synthetic transaction records.</p></div></div>
+        <div class="toolbar"><input id="transaction-search" placeholder="Search merchant, employee or transaction ID"><select id="transaction-department"><option value="">All departments</option></select><select id="transaction-category"><option value="">All categories</option></select><button class="secondary-btn" id="transactions-refresh">Refresh</button></div>
+        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Merchant</th><th>Department</th><th>Category</th><th>Employee</th><th class="right">Amount</th></tr></thead><tbody id="transactions-table"><tr><td colspan="6" class="empty">Connect to load transactions</td></tr></tbody></table></div><div class="pagination"><span id="transaction-page-label">—</span><div><button class="secondary-btn small" id="prev-page">Previous</button><button class="secondary-btn small" id="next-page">Next</button></div></div></div>
+      </section>
+      <footer>SpendLens <span>•</span> Synthetic demonstration environment <span class="footer-right">A flag is a review signal, not a verdict.</span></footer>
+    </main>
+  </div>
+  <div class="connect-overlay" id="connect-overlay"><div class="connect-card"><div class="brand large"><div class="brand-mark">S</div><div><b>spendlens</b><small>SPEND INTELLIGENCE</small></div></div><div class="eyebrow">ANALYST WORKSPACE</div><h1>See the story behind spend.</h1><p>Connect with your local SpendLens API to explore spending patterns and review findings.</p><label for="api-key">API key</label><input id="api-key" type="password" placeholder="Paste your viewer or analyst API key" autocomplete="off"><div class="connect-error" id="connect-error"></div><button class="primary-btn" id="connect-btn">Connect to workspace <span>→</span></button><small class="privacy-note">Your key is held in this browser tab only and is not sent anywhere except this local API.</small></div></div>
+  <div class="drawer-backdrop hidden" id="drawer-backdrop"><aside class="detail-drawer"><button class="close-btn" id="drawer-close">×</button><div id="finding-detail"><div class="empty">Select a finding</div></div></aside></div>
+  <div class="toast" id="toast"></div>
+  <script src="/assets/app.js"></script>
+</body></html>
