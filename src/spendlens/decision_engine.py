@@ -87,7 +87,7 @@ def evaluate_expense(expense: dict, policy: dict) -> dict:
     try:
         date.fromisoformat(str(expense.get("transaction_date", "")))
         date_valid = True
-    except ValueError:
+    except (TypeError, ValueError):
         date_valid = False
     if not date_valid:
         insufficient = True
