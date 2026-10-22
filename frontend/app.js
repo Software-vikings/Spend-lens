@@ -1,9 +1,14 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const state = {key:"", findings:[], transactions:[], page:0, pageSize:25, total:0, selected:null, overview:null};
+  const state = {key:"", findings:[], transactions:[], page:0, pageSize:25, total:0, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
   const money = n => new Intl.NumberFormat("en-IE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(Number(n||0));
   const number = n => new Intl.NumberFormat("en-US").format(Number(n||0));
   const esc = v => String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const filterQuery = () => {
+    const qs = new URLSearchParams();
+    Object.entries(state.filters).forEach(([key,value])=>{if(value)qs.set(key,value);});
+    return qs.toString();
+  };
   const api = async (path, options={}) => {
     const response = await fetch(path,{...options,headers:{"X-API-Key":state.key,"Content-Type":"application/json",...(options.headers||{})}});
     if (!response.ok) { let message=`Request failed (${response.status})`;try{message=(await response.json()).detail||message}catch{};throw new Error(message); }
@@ -16,9 +21,41 @@
     try { await api("/v1/summary"); sessionStorage.setItem("spendlens-key",state.key);$("connect-overlay").classList.add("hidden");$("connection-dot").classList.remove("red");$("connection-label").textContent="Connected";await refreshAll(); }
     catch(e){$("connect-error").textContent=e.message;state.key="";}
   };
+  const loadFilterOptions = async () => {
+    if(state.filterOptions)return;
+    const base=await api("/v1/analytics/overview");
+    state.filterOptions={
+      months:(base.monthly||[]).map(x=>x.month),
+      departments:(base.departments||[]).map(x=>x.department),
+      categories:(base.categories||[]).map(x=>x.category)
+    };
+    $("transaction-month").innerHTML='<option value="">All months</option>'+state.filterOptions.months.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+    $("transaction-department").innerHTML='<option value="">All departments</option>'+state.filterOptions.departments.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+    $("transaction-category").innerHTML='<option value="">All categories</option>'+state.filterOptions.categories.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  };
+  const renderFilterState = () => {
+    const labels=[];
+    if(state.filters.month)labels.push(`Month: ${state.filters.month}`);
+    if(state.filters.department)labels.push(`Department: ${state.filters.department}`);
+    if(state.filters.category)labels.push(`Category: ${state.filters.category}`);
+    $("filter-summary").textContent=labels.length?`Filtered by ${labels.join(" · ")}`:"Showing all available transaction data";
+    $("clear-filters").disabled=!labels.length;
+    $("transaction-month").value=state.filters.month;
+    $("transaction-department").value=state.filters.department;
+    $("transaction-category").value=state.filters.category;
+  };
+  const setFilter = async (type,value) => {
+    if(!(type in state.filters))return;
+    state.filters[type]=state.filters[type]===value?"":value;
+    state.page=0;
+    await refreshAll();
+  };
   const refreshAll = async () => {
     try {
-      const [summary,overview,findings]=await Promise.all([api("/v1/summary"),api("/v1/analytics/overview"),api("/v1/findings?limit=100")]);
+      await loadFilterOptions();
+      const qs=filterQuery();
+      const suffix=qs?`?${qs}`:"";
+      const [summary,overview,findings]=await Promise.all([api("/v1/summary"+suffix),api("/v1/analytics/overview"+suffix),api("/v1/findings?limit=100")]);
       state.overview=overview;state.findings=findings.items||[];
       $("total-spend").textContent=money(summary.total_spend);
       $("transaction-count").textContent=number(summary.transaction_count);
@@ -27,19 +64,23 @@
       $("finding-types").textContent=number(Object.keys(summary.findings_by_type||{}).length);
       $("nav-count").textContent=number(state.findings.length);
       renderTrend(overview.monthly||[]);renderDepartments(overview.departments||[]);renderCategories(overview.categories||[]);renderLatest();
-      renderFindings(); await loadTransactions();
+      renderFindings();renderFilterState();await loadTransactions();
     } catch(e){toast(e.message);if(/key|auth|credential/i.test(e.message)){ $("connect-overlay").classList.remove("hidden");$("connection-label").textContent="Disconnected";$("connection-dot").classList.add("red");}}
   };
   const renderTrend = rows => {
     if(!rows.length){$("trend-chart").innerHTML='<div class="empty">No monthly data available</div>';return;}
     const max=Math.max(...rows.map(x=>x.spend),1);
-    $("trend-chart").innerHTML=rows.map(x=>`<div class="trend-col"><div class="trend-bar-wrap"><div class="trend-bar" style="height:${Math.max(3,x.spend/max*100)}%"><span>${money(x.spend)}</span></div></div><small>${esc(x.month)}</small></div>`).join("");
+    $("trend-chart").innerHTML=rows.map(x=>`<button type="button" class="trend-col chart-select ${state.filters.month===x.month?"selected":""}" data-filter-type="month" data-filter-value="${esc(x.month)}" aria-pressed="${state.filters.month===x.month}"><span class="trend-bar-wrap"><span class="trend-bar" style="height:${Math.max(3,x.spend/max*100)}%"><span>${money(x.spend)}</span></span></span><small>${esc(x.month)}</small></button>`).join("");
   };
   const renderDepartments = rows => {
     const max=Math.max(...rows.map(x=>x.spend),1);
-    $("department-chart").innerHTML=rows.map(x=>`<div class="bar-row"><label title="${esc(x.department)}">${esc(x.department)}</label><div class="bar-track"><div class="bar-fill" style="width:${x.spend/max*100}%"></div></div><b>${money(x.spend)}</b></div>`).join("")||'<div class="empty">No department data</div>';
+    $("department-chart").innerHTML=rows.map(x=>`<button type="button" class="bar-row chart-select ${state.filters.department===x.department?"selected":""}" data-filter-type="department" data-filter-value="${esc(x.department)}" aria-pressed="${state.filters.department===x.department}"><span class="bar-label" title="${esc(x.department)}">${esc(x.department)}</span><span class="bar-track"><span class="bar-fill" style="width:${x.spend/max*100}%"></span></span><b>${money(x.spend)}</b></button>`).join("")||'<div class="empty">No department data</div>';
   };
-  const renderCategories = rows => $("category-list").innerHTML=rows.map(x=>`<div class="category-item"><span>${esc(x.category)}</span><b>${money(x.spend)}</b></div>`).join("")||'<div class="empty">No category data</div>';
+  const renderCategories = rows => $("category-list").innerHTML=rows.map(x=>`<button type="button" class="category-item chart-select ${state.filters.category===x.category?"selected":""}" data-filter-type="category" data-filter-value="${esc(x.category)}" aria-pressed="${state.filters.category===x.category}"><span>${esc(x.category)}</span><b>${money(x.spend)}</b></button>`).join("")||'<div class="empty">No category data</div>';
+  ["trend-chart","department-chart","category-list"].forEach(id=>$(id).addEventListener("click",e=>{
+    const target=e.target.closest("[data-filter-type]");
+    if(target)setFilter(target.dataset.filterType,target.dataset.filterValue);
+  }));
   const details = f => f.details||{};
   const merchant = f => details(f).merchant_name||details(f).merchant||details(f).merchant_id||f.finding_type.replaceAll("_"," ");
   const amount = f => details(f).amount??details(f).current_amount??details(f).new_amount??details(f).total_amount;
@@ -57,6 +98,7 @@
   const loadTransactions = async () => {
     const dept=$("transaction-department").value,cat=$("transaction-category").value;
     const qs=new URLSearchParams({limit:state.pageSize,offset:state.page*state.pageSize});
+    Object.entries(state.filters).forEach(([key,value])=>{if(value)qs.set(key,value);});
     if(dept)qs.set("department",dept);if(cat)qs.set("category",cat);
     const search=$("transaction-search").value.trim();if(search)qs.set("q",search);
     const data=await api("/v1/transactions?"+qs.toString());state.transactions=data.items||[];state.total=data.total||0;
@@ -69,9 +111,16 @@
   const renderTransactions = () => {
     const q=$("transaction-search").value.toLowerCase();
     const rows=state.transactions.filter(x=>[x.transaction_id,x.merchant_name,x.employee_id,x.department,x.category].join(" ").toLowerCase().includes(q));
-    $("transactions-table").innerHTML=rows.map(x=>`<tr><td>${esc(x.transaction_date)}</td><td><strong>${esc(x.merchant_name)}</strong><div class="finding-meta">${esc(x.merchant_id)}</div></td><td>${esc(x.department)}</td><td>${esc(x.category)}</td><td>${esc(x.employee_id)}</td><td class="right"><strong>${money(x.amount)}</strong></td></tr>`).join("")||'<tr><td colspan="6" class="empty">No matching transactions</td></tr>';
+    $("transactions-table").innerHTML=rows.map(x=>`<tr class="transaction-row" data-transaction-id="${esc(x.transaction_id)}" tabindex="0"><td>${esc(x.transaction_date)}</td><td><strong>${esc(x.merchant_name)}</strong><div class="finding-meta">${esc(x.merchant_id)}</div></td><td>${esc(x.department)}</td><td>${esc(x.category)}</td><td>${esc(x.employee_id)}</td><td class="right"><strong>${money(x.amount)}</strong></td></tr>`).join("")||'<tr><td colspan="6" class="empty">No matching transactions</td></tr>';
+    $("transactions-table").querySelectorAll("[data-transaction-id]").forEach(el=>el.addEventListener("click",()=>openTransaction(state.transactions.find(x=>x.transaction_id===el.dataset.transactionId))));
     $("transaction-page-label").textContent=`Showing ${state.total?state.page*state.pageSize+1:0}–${Math.min((state.page+1)*state.pageSize,state.total)} of ${number(state.total)}`;
     $("prev-page").disabled=state.page===0;$("next-page").disabled=(state.page+1)*state.pageSize>=state.total;
+  };
+  const openTransaction = tx => {
+    if(!tx)return;
+    $("finding-detail").innerHTML=`<div class="eyebrow">TRANSACTION DETAIL</div><h2>${esc(tx.merchant_name)}</h2><div class="detail-type">${esc(tx.transaction_id)} · ${esc(tx.transaction_date)}</div><div class="detail-amount">${money(tx.amount)}</div><div class="detail-section"><h3>Transaction context</h3><div class="detail-grid">${Object.entries(tx).map(([k,v])=>`<div class="detail-field"><small>${esc(k.replaceAll("_"," "))}</small><b>${esc(v)}</b></div>`).join("")}</div></div><button class="secondary-btn" id="transaction-context-filter">Filter dashboard to this department</button>`;
+    $("drawer-backdrop").classList.remove("hidden");
+    $("transaction-context-filter").addEventListener("click",()=>{ $("drawer-backdrop").classList.add("hidden");setFilter("department",tx.department);showSection("overview");});
   };
   const openFinding = async id => {
     try{
@@ -91,17 +140,28 @@
     }catch(e){toast(e.message);}
   };
   const showSection = id => {
+    state.currentSection=id;
     ["overview","findings","transactions"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
     document.querySelectorAll(".nav-item").forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+id));
     $("crumb-title").textContent=id[0].toUpperCase()+id.slice(1);
+    if(id==="transactions")loadTransactions();
   };
-  document.querySelectorAll(".nav-item").forEach(a=>a.addEventListener("click",e=>{e.preventDefault();const id=a.getAttribute("href").slice(1);showSection(id);if(id==="transactions")loadTransactions();}));
+  document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener("click",e=>{
+    const id=a.getAttribute("href").slice(1);
+    if(["overview","findings","transactions"].includes(id)){e.preventDefault();showSection(id);}
+  }));
+  $("transaction-count-card").addEventListener("click",()=>showSection("transactions"));
+  $("transaction-count-card").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showSection("transactions");}});
+  $("view-filtered-transactions").addEventListener("click",()=>showSection("transactions"));
+  $("clear-filters").addEventListener("click",async()=>{state.filters={month:"",department:"",category:""};state.page=0;await refreshAll();});
   $("connect-btn").addEventListener("click",connect);$("api-key").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
   $("refresh-btn").addEventListener("click",refreshAll);$("findings-refresh").addEventListener("click",refreshAll);$("transactions-refresh").addEventListener("click",()=>loadTransactions());
   $("finding-search").addEventListener("input",renderFindings);$("finding-status").addEventListener("change",renderFindings);
   let searchTimer=null;
   $("transaction-search").addEventListener("input",()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{state.page=0;loadTransactions();},250);});
-  ["transaction-department","transaction-category"].forEach(id=>$(id).addEventListener("change",()=>{state.page=0;loadTransactions();}));
+  $("transaction-month").addEventListener("change",()=>setFilter("month",$("transaction-month").value||state.filters.month));
+  $("transaction-department").addEventListener("change",()=>setFilter("department",$("transaction-department").value||state.filters.department));
+  $("transaction-category").addEventListener("change",()=>setFilter("category",$("transaction-category").value||state.filters.category));
   $("prev-page").addEventListener("click",()=>{if(state.page>0){state.page--;loadTransactions();}});
   $("next-page").addEventListener("click",()=>{if((state.page+1)*state.pageSize<state.total){state.page++;loadTransactions();}});
   $("drawer-close").addEventListener("click",()=>$("drawer-backdrop").classList.add("hidden"));
