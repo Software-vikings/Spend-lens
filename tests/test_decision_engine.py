@@ -61,3 +61,24 @@ def test_identical_inputs_are_deterministic():
 def test_policy_rejects_unsupported_over_limit_action():
     with pytest.raises(ValueError, match="over_limit_action"):
         validate_policy(dict(POLICY, over_limit_action="AUTO_APPROVE"))
+
+
+def test_zero_amount_is_insufficient_data_not_approved():
+    result = evaluate_expense(expense(amount="0"), POLICY)
+    assert result["outcome"] == "INSUFFICIENT_DATA"
+    assert any("amount must be greater than zero" in str(rule["evidence"]) for rule in result["evaluated_rules"])
+
+
+def test_future_dated_expense_is_insufficient_data():
+    from datetime import date, timedelta
+    future = (date.today() + timedelta(days=1)).isoformat()
+    result = evaluate_expense(expense(transaction_date=future), POLICY)
+    assert result["outcome"] == "INSUFFICIENT_DATA"
+    assert any(rule["rule_id"] == "INPUT-002" and rule["status"] == "INSUFFICIENT"
+               for rule in result["evaluated_rules"])
+
+
+def test_malformed_currency_is_insufficient_data():
+    result = evaluate_expense(expense(currency="EURO"), POLICY)
+    assert result["outcome"] == "INSUFFICIENT_DATA"
+    assert any(rule["rule_id"] == "INPUT-003" for rule in result["evaluated_rules"])
