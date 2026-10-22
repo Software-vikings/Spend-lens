@@ -1,7 +1,13 @@
 name: SpendLens CI
 on:
   push:
+    branches: [main]
   pull_request:
+
+concurrency:
+  group: spendlens-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
