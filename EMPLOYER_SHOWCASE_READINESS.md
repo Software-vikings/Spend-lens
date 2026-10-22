@@ -118,3 +118,12 @@ The previous 73% estimate is withdrawn for product completion. It reflected repo
 The existing anomaly detector and insight heuristics are supplementary risk signals. They do not decide whether an expense is eligible or reimbursable. The current findings/review workflow is not an automated approval workflow. The current frontend is a monolithic imperative script and has no claim/decision/policy workflow.
 
 The product acceptance criteria and rebuild sequence are now defined in [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md). Do not describe the system as automatically approving or rejecting expenses until the Phase 2 engine and Phase 3 workflow exit gates pass.
+
+## Rebuild execution status — 22 October 2026
+
+- Phase 0 documentation reset is complete on branch rebuild/decision-engine-and-dashboard.
+- A first decision-engine vertical slice has been added in draft PR #3: deterministic four-outcome policy evaluation, synthetic versioned policy, SQLite decision persistence, authenticated evaluation/list/detail endpoints and tests.
+- This implementation is not yet accepted as complete: hosted CI status is not verified, the claim/evidence domain model remains incomplete, and the frontend remains the old monolithic dashboard.
+- No new completion percentage is awarded yet. Retain 24/100 as the pre-implementation baseline until CI and rubric evidence are available.
+- Private prompt/decision/change history is not stored in this public repository. The .spendlens-private/ directory is ignored by Git. The private worklog is maintained separately.
+- Draft PR: https://github.com/Software-vikings/Spend-lens/pull/3
