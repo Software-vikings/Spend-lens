@@ -153,3 +153,27 @@ A synthetic expense can be submitted, automatically evaluated against a versione
 - Earlier implementation run #65 also passed all steps.
 
 The phase 2 engine/API slice is now CI-verified, but Phase 2 is not fully complete because override, re-evaluation and audit lifecycle acceptance tests are not present. The dashboard is not browser-verified. The PR remains a draft and has not been merged.
+
+
+## Micro-detail UX and claim-quality pass — 22 October 2026
+
+The following code changes have been made on the rebuild branch; hosted CI and browser acceptance are pending:
+
+- Dashboard chart faceting: each chart now requests data with its own selected dimension excluded while retaining the other active filters. Selecting one month therefore no longer removes all alternative months from the trend chart; the same principle applies to department and category charts.
+- Decision result explanation: the UI previously interpolated the structured `decision_explanation` object as a string, which displayed an unhelpful `[object Object]`. The UI now renders a plain-language explanation for each of the four outcomes.
+- Claim intake: replaced pre-filled demo claim values with explicit employee ID, merchant, department, date, amount, currency, category, business purpose and receipt metadata inputs.
+- Evidence honesty: the interface now explicitly says receipt images are not uploaded/OCR-verified and the duplicate-risk checkbox is a simulated input, not an automatic duplicate detector.
+- Transaction drill-through: transaction details now use labelled business fields and explain that a ledger transaction is not automatically a reimbursement claim or approval decision. Keyboard Enter/Space opens a selected transaction.
+- Financial precision: transaction amounts now preserve cents and use each row's recorded currency instead of rounding every value to whole EUR.
+- Input quality: the engine now treats zero amounts, future dates, malformed currency codes and missing employee/merchant/department context as insufficient data rather than allowing an approval.
+- Visual refinements: corrected chart button chrome, selected states, responsive claim form layout, readable rule-result hierarchy and more explicit workspace-wide findings labelling.
+
+### Acceptance checks still required
+- GitHub Actions must pass on the latest branch head.
+- Browser walkthrough must confirm chart facets remain selectable after a filter is active, filter chips/controls stay in sync, and totals reconcile with the ledger.
+- Submit claims covering each outcome and inspect every rule explanation.
+- Confirm receipt status and amount mismatch cases; confirm no claim is described as receipt-verified when only metadata was entered.
+- Open transactions by mouse and keyboard and confirm the drawer context and department drill-through.
+- Inspect at desktop and mobile widths for clipped labels, inaccessible controls and layout overflow.
+
+**Score treatment:** retain 49/100 until the new changes pass hosted CI and the dashboard acceptance checks. Do not award visual or interaction credit based on source edits alone.
