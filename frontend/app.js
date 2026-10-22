@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const state = {key:"", findings:[], transactions:[], decisions:[], page:0, pageSize:25, total:0, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
+  const state = {key:"", findings:[], transactions:[], decisions:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, findingTotal:0, decisionTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
   const money = (n,currency="EUR") => {
     try{return new Intl.NumberFormat("en-IE",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n||0));}
     catch{return `${currency} ${Number(n||0).toFixed(2)}`;}
@@ -68,10 +68,10 @@
         api("/v1/analytics/overview"+(trendQuery.toString()?"?"+trendQuery:"")),
         api("/v1/analytics/overview"+(departmentQuery.toString()?"?"+departmentQuery:"")),
         api("/v1/analytics/overview"+(categoryQuery.toString()?"?"+categoryQuery:"")),
-        api("/v1/findings?limit=100"),api("/v1/decisions?limit=100")
+        api(`/v1/findings?limit=${state.listPageSize}&offset=${state.findingPage*state.listPageSize}`),api(`/v1/decisions?limit=${state.listPageSize}&offset=${state.decisionPage*state.listPageSize}`)
       ]);
-      state.overview=overview;state.findings=findings.items||[];state.decisions=decisions.items||[];
-      $("decision-count").textContent=number(decisions.total||0);renderDecisions();
+      state.overview=overview;state.findings=findings.items||[];state.findingTotal=findings.total||0;state.decisions=decisions.items||[];state.decisionTotal=decisions.total||0;
+      $("decision-count").textContent=number(decisions.total||0);renderDecisions();updateListPagination();
       $("total-spend").textContent=money(summary.total_spend);
       $("transaction-count").textContent=number(summary.transaction_count);
       const open=Object.entries(summary.findings_by_status||{}).filter(([k])=>["new","under_review"].includes(k)).reduce((a,[,v])=>a+v,0);
@@ -103,6 +103,29 @@
     const rows=state.findings.slice(0,5);
     $("latest-findings").innerHTML=rows.map(f=>`<div class="finding-line" data-id="${esc(f.finding_id)}"><div><div class="finding-title">${esc(merchant(f))}</div><div class="finding-meta">${esc(f.finding_type.replaceAll("_"," "))} · ${esc(f.finding_id.slice(0,12))}</div></div><div><div class="finding-amount">${amount(f)!=null?money(amount(f)):"—"}</div><div style="text-align:right;margin-top:5px"><span class="status ${esc(f.review_status)}">${esc(f.review_status.replaceAll("_"," "))}</span></div></div></div>`).join("")||'<div class="empty">No findings yet</div>';
     $("latest-findings").querySelectorAll("[data-id]").forEach(el=>el.addEventListener("click",()=>openFinding(el.dataset.id)));
+  };
+  const updateListPagination = () => {
+    const findingStart=state.findingTotal?state.findingPage*state.listPageSize+1:0;
+    const decisionStart=state.decisionTotal?state.decisionPage*state.listPageSize+1:0;
+    $("finding-page-label").textContent=`Showing ${findingStart}–${Math.min((state.findingPage+1)*state.listPageSize,state.findingTotal)} of ${number(state.findingTotal)}`;
+    $("decision-page-label").textContent=`Showing ${decisionStart}–${Math.min((state.decisionPage+1)*state.listPageSize,state.decisionTotal)} of ${number(state.decisionTotal)}`;
+    $("finding-prev").disabled=state.findingPage===0;
+    $("finding-next").disabled=(state.findingPage+1)*state.listPageSize>=state.findingTotal;
+    $("decision-prev").disabled=state.decisionPage===0;
+    $("decision-next").disabled=(state.decisionPage+1)*state.listPageSize>=state.decisionTotal;
+  };
+  const loadFindingPage = async () => {
+    const status=$("finding-status").value;
+    const qs=new URLSearchParams({limit:state.listPageSize,offset:state.findingPage*state.listPageSize});
+    if(status)qs.set("status",status);
+    const data=await api("/v1/findings?"+qs.toString());
+    state.findings=data.items||[];state.findingTotal=data.total||0;renderFindings();updateListPagination();
+  };
+  const loadDecisionPage = async () => {
+    const qs=new URLSearchParams({limit:state.listPageSize,offset:state.decisionPage*state.listPageSize});
+    const data=await api("/v1/decisions?"+qs.toString());
+    state.decisions=data.items||[];state.decisionTotal=data.total||0;
+    $("decision-count").textContent=number(state.decisionTotal);renderDecisions();updateListPagination();
   };
   const renderFindings = () => {
     const q=$("finding-search").value.toLowerCase(),status=$("finding-status").value;
@@ -191,7 +214,7 @@
   $("view-filtered-transactions").addEventListener("click",()=>showSection("transactions"));
   $("clear-filters").addEventListener("click",async()=>{state.filters={month:"",department:"",category:""};state.page=0;await refreshAll();});
   $("decisions-table").addEventListener("click",e=>{const b=e.target.closest("[data-decision-id]");if(b)showDecision(b.dataset.decisionId);});
-  $("decisions-refresh").addEventListener("click",async()=>{try{const d=await api("/v1/decisions?limit=100");state.decisions=d.items||[];renderDecisions();$("decision-count").textContent=number(d.total||0);}catch(e){toast(e.message);}});
+  $("decisions-refresh").addEventListener("click",async()=>{try{state.decisionPage=0;await loadDecisionPage();}catch(e){toast(e.message);}});
   let pendingIdempotencyKey=null;
   $("expense-evaluation-form").addEventListener("submit",async e=>{
     e.preventDefault();
@@ -204,14 +227,18 @@
       pendingIdempotencyKey=pendingIdempotencyKey||crypto.randomUUID();
       const result=await api("/v1/expenses/evaluate",{method:"POST",headers:{"Idempotency-Key":pendingIdempotencyKey},body:JSON.stringify({expense})});
       $("decision-result").innerHTML='<div class="empty">Decision recorded. Loading rule-level explanation…</div>';
-      const list=await api("/v1/decisions?limit=100");state.decisions=list.items||[];renderDecisions();$("decision-count").textContent=number(list.total||0);
+      state.decisionPage=0;await loadDecisionPage();
       await showDecision(result.decision_id);pendingIdempotencyKey=null;toast("Expense evaluated and decision saved.");
     }catch(err){toast(err.message==="Insufficient role"?"Expense evaluation requires an analyst API key. Reconnect with analyst access.":err.message);}
   });
   $("connect-btn").addEventListener("click",connect);
   $("expense-evaluation-form").addEventListener("input",e=>{if(e.target.matches("input,select,textarea"))e.target.classList.remove("field-invalid");});$("api-key").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
   $("refresh-btn").addEventListener("click",refreshAll);$("findings-refresh").addEventListener("click",refreshAll);$("transactions-refresh").addEventListener("click",()=>loadTransactions());
-  $("finding-search").addEventListener("input",renderFindings);$("finding-status").addEventListener("change",renderFindings);
+  $("finding-search").addEventListener("input",renderFindings);$("finding-status").addEventListener("change",()=>{state.findingPage=0;loadFindingPage().catch(e=>toast(e.message));});
+  $("finding-prev").addEventListener("click",()=>{if(state.findingPage>0){state.findingPage--;loadFindingPage().catch(e=>toast(e.message));}});
+  $("finding-next").addEventListener("click",()=>{if((state.findingPage+1)*state.listPageSize<state.findingTotal){state.findingPage++;loadFindingPage().catch(e=>toast(e.message));}});
+  $("decision-prev").addEventListener("click",()=>{if(state.decisionPage>0){state.decisionPage--;loadDecisionPage().catch(e=>toast(e.message));}});
+  $("decision-next").addEventListener("click",()=>{if((state.decisionPage+1)*state.listPageSize<state.decisionTotal){state.decisionPage++;loadDecisionPage().catch(e=>toast(e.message));}});
   let searchTimer=null;
   $("transaction-search").addEventListener("input",()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>{state.page=0;loadTransactions();},250);});
   $("transaction-month").addEventListener("change",()=>setFilter("month",$("transaction-month").value||state.filters.month));
