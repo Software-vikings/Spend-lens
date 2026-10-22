@@ -14,6 +14,7 @@ SpendLens analyses synthetic company expense transactions to surface unusual pat
 - Analyses monthly department spend and spend per employee using explicit headcount inputs.
 - Exposes authenticated FastAPI endpoints for summary, analytics, transactions, findings and analyst review.
 - Provides a browser dashboard with spend overview, findings queue, transaction explorer and review history.
+- Supports interactive month, department and category cross-filtering: selecting a chart value updates matching spend metrics, other transaction charts and the ledger; the transaction KPI opens the filtered ledger and transaction rows show detail.
 - Produces SQL analytics, Power BI-ready CSV exports and a multi-seed validation report.
 
 ## Architecture
@@ -64,18 +65,18 @@ Open http://127.0.0.1:8000 and enter the API key. The dashboard stores it in the
 ## API
 
 - `GET /health` — health check
-- `GET /v1/summary` — spend and finding summary
-- `GET /v1/analytics/overview` — monthly, department and category aggregates
-- `GET /v1/transactions` — searchable and paginated transactions
+- `GET /v1/summary` — spend and finding summary; accepts `month`, `department` and `category` filters
+- `GET /v1/analytics/overview` — monthly, department and category aggregates; accepts the same filters
+- `GET /v1/transactions` — searchable and paginated transactions; accepts the same filters
 - `GET /v1/findings` — findings queue
 - `GET /v1/findings/{finding_id}` — finding detail and review history
 - `PATCH /v1/findings/{finding_id}/review` — analyst review update
 
-All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role can update review state. The admin role currently has the same application permissions as analyst.
+All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role can update review state. The admin role currently has the same application permissions as analyst. The current cross-filtering applies to transaction spend, analytics and the transaction ledger. Finding counts and the findings list remain workspace-wide until every finding type has a reliable transaction-level relationship.
 
 ## Tests and CI
 
-Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions checks out the repository, installs dependencies, runs the tests, executes the synthetic pipeline and validation, and compiles Python source. **The hosted CI run for source commit `2900258` passed all steps**, including tests, pipeline and validation. Subsequent documentation updates were also checked by CI. [View GitHub Actions](https://github.com/Software-vikings/Spend-lens/actions).
+Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions checks out the repository, installs dependencies, runs the tests, executes the synthetic pipeline and validation, compiles Python source, and checks dashboard JavaScript syntax. **The hosted CI run for source commit `2900258` passed all steps**, including tests, pipeline and validation. Subsequent documentation updates were also checked by CI. [View GitHub Actions](https://github.com/Software-vikings/Spend-lens/actions).
 
 ## Power BI
 
