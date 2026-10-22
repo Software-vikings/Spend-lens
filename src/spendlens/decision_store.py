@@ -34,6 +34,46 @@ def init_decisions(db_path: str | Path) -> None:
         if "request_hash" not in columns:
             conn.execute("ALTER TABLE expense_decisions ADD COLUMN request_hash TEXT")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_expense_decisions_idempotency ON expense_decisions(idempotency_key) WHERE idempotency_key IS NOT NULL")
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS expense_claims (
+          claim_id TEXT PRIMARY KEY,
+          employee_id TEXT,
+          merchant_name TEXT,
+          department TEXT,
+          amount TEXT,
+          currency TEXT,
+          category TEXT,
+          transaction_date TEXT,
+          business_purpose TEXT,
+          current_status TEXT NOT NULL DEFAULT 'SUBMITTED',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          latest_decision_id TEXT,
+          current_payload TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_expense_claims_employee ON expense_claims(employee_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_expense_claims_status ON expense_claims(current_status);
+        CREATE TABLE IF NOT EXISTS claim_submissions (
+          submission_id TEXT PRIMARY KEY,
+          claim_id TEXT NOT NULL REFERENCES expense_claims(claim_id),
+          decision_id TEXT NOT NULL UNIQUE REFERENCES expense_decisions(decision_id),
+          submitted_at TEXT NOT NULL,
+          payload TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_claim_submissions_claim ON claim_submissions(claim_id, submitted_at);
+        CREATE TABLE IF NOT EXISTS claim_evidence (
+          evidence_id TEXT PRIMARY KEY,
+          claim_id TEXT NOT NULL REFERENCES expense_claims(claim_id),
+          decision_id TEXT NOT NULL REFERENCES expense_decisions(decision_id),
+          evidence_type TEXT NOT NULL,
+          evidence_ref TEXT,
+          evidence_status TEXT NOT NULL,
+          source TEXT NOT NULL,
+          metadata TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_claim_evidence_claim ON claim_evidence(claim_id, created_at);
+        """)
 
 
 
@@ -75,6 +115,7 @@ def save_decision(db_path: str | Path, expense: dict, evaluation: dict,
             if existing["request_hash"] != request_hash:
                 raise ValueError("Idempotency key was already used for a different expense request")
             return get_decision(db_path, existing["decision_id"])
+    now = datetime.now(timezone.utc).isoformat()
     decision = {
         "decision_id": str(uuid.uuid4()),
         "expense_id": str(evaluation["expense_id"]),
@@ -82,11 +123,20 @@ def save_decision(db_path: str | Path, expense: dict, evaluation: dict,
         "policy_id": evaluation["policy_id"],
         "policy_version": evaluation["policy_version"],
         "engine_version": evaluation["engine_version"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": now,
         "expense": expense,
         "evaluation": evaluation,
     }
+    claim_id = decision["expense_id"]
     with connect(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if idempotency_key:
+            existing = conn.execute("SELECT decision_id,request_hash FROM expense_decisions WHERE idempotency_key=?", (idempotency_key,)).fetchone()
+            if existing:
+                if existing["request_hash"] != request_hash:
+                    raise ValueError("Idempotency key was already used for a different expense request")
+                conn.rollback()
+                return get_decision(db_path, existing["decision_id"])
         conn.execute("""
           INSERT INTO expense_decisions
           (decision_id,expense_id,outcome,policy_id,policy_version,engine_version,
@@ -94,8 +144,40 @@ def save_decision(db_path: str | Path, expense: dict, evaluation: dict,
           VALUES(?,?,?,?,?,?,?,?,?,?,?)
         """, (decision["decision_id"], decision["expense_id"], decision["outcome"],
               decision["policy_id"], decision["policy_version"], decision["engine_version"],
-              decision["created_at"], json.dumps(expense, sort_keys=True),
-              json.dumps(evaluation, sort_keys=True), idempotency_key, request_hash))
+              now, json.dumps(expense, sort_keys=True), json.dumps(evaluation, sort_keys=True),
+              idempotency_key, request_hash))
+        conn.execute("""
+          INSERT INTO expense_claims
+          (claim_id,employee_id,merchant_name,department,amount,currency,category,
+           transaction_date,business_purpose,current_status,created_at,updated_at,
+           latest_decision_id,current_payload)
+          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          ON CONFLICT(claim_id) DO UPDATE SET
+            employee_id=excluded.employee_id, merchant_name=excluded.merchant_name,
+            department=excluded.department, amount=excluded.amount, currency=excluded.currency,
+            category=excluded.category, transaction_date=excluded.transaction_date,
+            business_purpose=excluded.business_purpose,current_status=excluded.current_status,
+            updated_at=excluded.updated_at,latest_decision_id=excluded.latest_decision_id,
+            current_payload=excluded.current_payload
+        """, (claim_id, expense.get("employee_id"), expense.get("merchant_name"),
+              expense.get("department"), str(expense.get("amount")) if expense.get("amount") is not None else None,
+              expense.get("currency"), expense.get("category"), expense.get("transaction_date"),
+              expense.get("business_purpose"), decision["outcome"], now, now,
+              decision["decision_id"], json.dumps(expense, sort_keys=True)))
+        conn.execute("""
+          INSERT INTO claim_submissions(submission_id,claim_id,decision_id,submitted_at,payload)
+          VALUES(?,?,?,?,?)
+        """, (str(uuid.uuid4()), claim_id, decision["decision_id"], now, json.dumps(expense, sort_keys=True)))
+        receipt = expense.get("receipt") or {}
+        if receipt:
+            conn.execute("""
+              INSERT INTO claim_evidence
+              (evidence_id,claim_id,decision_id,evidence_type,evidence_ref,evidence_status,
+               source,metadata,created_at)
+              VALUES(?,?,?,?,?,?,?,?,?)
+            """, (str(uuid.uuid4()), claim_id, decision["decision_id"], "RECEIPT",
+                  receipt.get("receipt_id"), "METADATA_SUBMITTED" if receipt.get("provided") else "NOT_PROVIDED",
+                  "SUBMITTED_METADATA", json.dumps(receipt, sort_keys=True), now))
     return decision
 
 
@@ -123,4 +205,24 @@ def get_decision(db_path: str | Path, decision_id: str) -> dict | None:
     item = dict(row)
     item["expense"] = json.loads(item.pop("expense_payload"))
     item["evaluation"] = json.loads(item.pop("evaluation_payload"))
+    return item
+
+
+def get_claim(db_path: str | Path, claim_id: str) -> dict | None:
+    with connect(db_path) as conn:
+        claim = conn.execute("SELECT * FROM expense_claims WHERE claim_id=?", (claim_id,)).fetchone()
+        if claim is None:
+            return None
+        submissions = conn.execute(
+            "SELECT submission_id,decision_id,submitted_at,payload FROM claim_submissions WHERE claim_id=? ORDER BY submitted_at DESC",
+            (claim_id,)
+        ).fetchall()
+        evidence = conn.execute(
+            "SELECT evidence_id,decision_id,evidence_type,evidence_ref,evidence_status,source,metadata,created_at FROM claim_evidence WHERE claim_id=? ORDER BY created_at DESC",
+            (claim_id,)
+        ).fetchall()
+    item = dict(claim)
+    item["current_payload"] = json.loads(item["current_payload"])
+    item["submissions"] = [{**dict(row), "payload": json.loads(row["payload"])} for row in submissions]
+    item["evidence"] = [{**dict(row), "metadata": json.loads(row["metadata"])} for row in evidence]
     return item
