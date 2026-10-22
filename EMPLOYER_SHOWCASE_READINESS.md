@@ -144,3 +144,14 @@ The product acceptance criteria and rebuild sequence are now defined in [PRODUCT
 
 
 - Latest PR-head CI verification: SpendLens CI run #71 (ID 39769318304) passed on 22 October 2026. Pytest: 44 passed, one Starlette/httpx deprecation warning; synthetic pipeline, multi-seed validation, Python compilation and JavaScript syntax checks passed. https://github.com/Software-vikings/Spend-lens/actions/runs/39769318304
+
+
+## Micro-detail dashboard and claim-intake changes — verification pending
+
+- Added faceted chart queries so month, department and category charts retain alternative choices while compatible filters remain active.
+- Fixed structured decision explanation rendering; the previous UI displayed `[object Object]`.
+- Replaced hard-coded demo form values with explicit employee, merchant, department, date, amount, currency, category, purpose and receipt metadata fields.
+- Clearly disclosed that receipt images/OCR are not implemented and duplicate-risk is simulated input.
+- Improved transaction drill-through, keyboard opening, amount precision/currency formatting and selected chart states.
+- Engine now treats zero amounts, future dates, malformed currency codes and missing employee/merchant/department details as insufficient data.
+- Latest changes are not yet CI-verified or browser-verified. Product score remains 49/100 until evidence is available.
