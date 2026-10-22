@@ -229,6 +229,27 @@ def test_expense_evaluation_idempotency_returns_same_decision(tmp_path):
     assert first.json()["decision_id"] == second.json()["decision_id"]
     assert client.get("/v1/decisions",headers={"X-API-Key":VIEWER}).json()["total"] == 1
 
+def test_concurrent_idempotent_submissions_create_one_decision(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    db,_=prepared_db(tmp_path)
+    expense={"expense_id":"EXP-CONCURRENT-001","employee_id":"EMP-CONCURRENT",
+      "merchant_name":"Office Depot","department":"Operations","amount":"40.00",
+      "currency":"EUR","category":"Office Supplies","transaction_date":"2026-05-15",
+      "business_purpose":"Printer paper","receipt":{"provided":True,"readable":True,
+      "receipt_id":"R-CONCURRENT-001","total":"40.00"}}
+    headers={"X-API-Key":ANALYST,"Idempotency-Key":"concurrent-submit-00000001"}
+    def submit(_):
+        with TestClient(create_app(db,api_keys=KEYS)) as client:
+            return client.post("/v1/expenses/evaluate",headers=headers,json={"expense":expense})
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        responses=list(pool.map(submit,range(4)))
+    assert all(response.status_code==200 for response in responses)
+    assert len({response.json()["decision_id"] for response in responses})==1
+    with TestClient(create_app(db,api_keys=KEYS)) as client:
+        decisions=client.get("/v1/decisions?limit=20",headers={"X-API-Key":VIEWER}).json()
+        assert decisions["total"]==1
+
+
 def test_idempotency_key_cannot_be_reused_for_different_expense(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
     headers={"X-API-Key":ANALYST,"Idempotency-Key":"expense-submit-000000000002"}
