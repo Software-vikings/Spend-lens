@@ -242,7 +242,8 @@
     ["overview","findings","transactions","decisions","claims","policies"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
     document.querySelectorAll(".nav-item").forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+id));
     $("crumb-title").textContent=id[0].toUpperCase()+id.slice(1);
-    if(id==="transactions")loadTransactions();\n    if(id==="policies")loadPolicies().catch(e=>toast(e.message));
+    if(id==="transactions")loadTransactions();
+    if(id==="policies")loadPolicies().catch(e=>toast(e.message));
   };
   document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener("click",e=>{
     const id=a.getAttribute("href").slice(1);
