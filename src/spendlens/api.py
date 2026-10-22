@@ -267,11 +267,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         seed_path=ROOT/"policies"/"demo_policy.json"
         init_policy_registry(db_path,json.loads(seed_path.read_text()) if seed_path.exists() else None)
         try:
-            result = create_policy_version(db_path,body,actor)
-            record_audit_event(db_path,"POLICY_CREATED","policy",
-                f"{result.get('policy_id')}:{result.get('version')}",actor,
-                {"policy_id":result.get("policy_id"),"version":result.get("version")})
-            return result
+            return create_policy_version(db_path,body,actor)
         except ValueError as exc: raise HTTPException(409 if "already exists" in str(exc) else 422,str(exc)) from exc
 
     @app.post("/v1/policies/{policy_id}/{version}/activate")
@@ -280,10 +276,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         seed_path=ROOT/"policies"/"demo_policy.json"
         init_policy_registry(db_path,json.loads(seed_path.read_text()) if seed_path.exists() else None)
         try:
-            result = activate_policy_version(db_path,policy_id,version,actor)
-            record_audit_event(db_path,"POLICY_ACTIVATED","policy",
-                f"{policy_id}:{version}",actor,{"policy_id":policy_id,"version":version})
-            return result
+            return activate_policy_version(db_path,policy_id,version,actor)
         except LookupError as exc: raise HTTPException(404,str(exc)) from exc
 
     @app.post("/v1/expenses/evaluate")
