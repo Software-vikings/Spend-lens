@@ -1,7 +1,10 @@
 (() => {
   const $ = id => document.getElementById(id);
   const state = {key:"", findings:[], transactions:[], decisions:[], page:0, pageSize:25, total:0, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
-  const money = n => new Intl.NumberFormat("en-IE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(Number(n||0));
+  const money = (n,currency="EUR") => {
+    try{return new Intl.NumberFormat("en-IE",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n||0));}
+    catch{return `${currency} ${Number(n||0).toFixed(2)}`;}
+  };
   const number = n => new Intl.NumberFormat("en-US").format(Number(n||0));
   const esc = v => String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const filterQuery = () => {
@@ -133,7 +136,7 @@
   const renderTransactions = () => {
     const q=$("transaction-search").value.toLowerCase();
     const rows=state.transactions.filter(x=>[x.transaction_id,x.merchant_name,x.employee_id,x.department,x.category].join(" ").toLowerCase().includes(q));
-    $("transactions-table").innerHTML=rows.map(x=>`<tr class="transaction-row" data-transaction-id="${esc(x.transaction_id)}" tabindex="0"><td>${esc(x.transaction_date)}</td><td><strong>${esc(x.merchant_name)}</strong><div class="finding-meta">${esc(x.merchant_id)}</div></td><td>${esc(x.department)}</td><td>${esc(x.category)}</td><td>${esc(x.employee_id)}</td><td class="right"><strong>${money(x.amount)}</strong></td></tr>`).join("")||'<tr><td colspan="6" class="empty">No matching transactions</td></tr>';
+    $("transactions-table").innerHTML=rows.map(x=>`<tr class="transaction-row" data-transaction-id="${esc(x.transaction_id)}" tabindex="0"><td>${esc(x.transaction_date)}</td><td><strong>${esc(x.merchant_name)}</strong><div class="finding-meta">${esc(x.merchant_id)}</div></td><td>${esc(x.department)}</td><td>${esc(x.category)}</td><td>${esc(x.employee_id)}</td><td class="right"><strong>${money(x.amount,x.currency)}</strong></td></tr>`).join("")||'<tr><td colspan="6" class="empty">No matching transactions</td></tr>';
     $("transactions-table").querySelectorAll("[data-transaction-id]").forEach(el=>{
       const open=()=>openTransaction(state.transactions.find(x=>x.transaction_id===el.dataset.transactionId));
       el.addEventListener("click",open);
@@ -151,7 +154,7 @@
       ["Category",tx.category],["Payment method",tx.payment_method],
       ["Currency",tx.currency]
     ];
-    $("finding-detail").innerHTML=`<div class="eyebrow">LEDGER RECORD</div><h2>${esc(tx.merchant_name)}</h2><div class="detail-type">Transaction ${esc(tx.transaction_id)}</div><div class="detail-amount">${money(tx.amount)}</div><div class="detail-section"><h3>Transaction information</h3><div class="detail-grid">${fields.map(([k,v])=>`<div class="detail-field"><small>${esc(k)}</small><b>${esc(v??"Not recorded")}</b></div>`).join("")}</div></div><div class="detail-section"><h3>What this record means</h3><p class="decision-summary">This is a synthetic card/expense transaction record. It is not, by itself, an employee reimbursement claim and does not contain an attached receipt or approval decision.</p></div><div class="detail-section"><h3>Explore related spend</h3><button class="secondary-btn" id="transaction-context-filter">Filter dashboard to ${esc(tx.department)}</button></div>`;
+    $("finding-detail").innerHTML=`<div class="eyebrow">LEDGER RECORD</div><h2>${esc(tx.merchant_name)}</h2><div class="detail-type">Transaction ${esc(tx.transaction_id)}</div><div class="detail-amount">${money(tx.amount,tx.currency)}</div><div class="detail-section"><h3>Transaction information</h3><div class="detail-grid">${fields.map(([k,v])=>`<div class="detail-field"><small>${esc(k)}</small><b>${esc(v??"Not recorded")}</b></div>`).join("")}</div></div><div class="detail-section"><h3>What this record means</h3><p class="decision-summary">This is a synthetic card/expense transaction record. It is not, by itself, an employee reimbursement claim and does not contain an attached receipt or approval decision.</p></div><div class="detail-section"><h3>Explore related spend</h3><button class="secondary-btn" id="transaction-context-filter">Filter dashboard to ${esc(tx.department)}</button></div>`;
     $("drawer-backdrop").classList.remove("hidden");
     $("transaction-context-filter").addEventListener("click",()=>{ $("drawer-backdrop").classList.add("hidden");state.filters.department=tx.department;state.page=0;refreshAll().then(()=>showSection("overview"));});
   };
