@@ -1,15 +1,17 @@
-"""Hardened SpendLens API with API-key roles and basic request throttling.
+"""SpendLens API for upload analysis and protected operational workflows.
 
 This is a single-process portfolio deployment baseline, not a substitute for
 an enterprise identity provider, distributed rate limiter or security review.
 """
 from __future__ import annotations
-import json, os, secrets, time, logging, uuid
+import json, os, secrets, time, logging, uuid, math
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Literal
-from fastapi import FastAPI, HTTPException, Query, Header, Depends, Request
+from fastapi import FastAPI, HTTPException, Query, Header, Depends, Request, UploadFile, File
 from fastapi.responses import JSONResponse, FileResponse
+from zipfile import BadZipFile
+from .import_analysis import analyse_upload, MAX_UPLOAD_BYTES
 from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
 from .decision_engine import evaluate_expense
@@ -81,7 +83,8 @@ def parse_api_keys(raw: str | None = None) -> dict[str,str]:
     return result
 
 def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = None,
-               rate_limit: int = 120, rate_window_seconds: int = 60) -> FastAPI:
+               rate_limit: int = 600, rate_window_seconds: int = 60,
+               upload_rate_limit: int = 10, write_rate_limit: int = 60) -> FastAPI:
     db_path=Path(db_path)
     configured=parse_api_keys() if api_keys is None else dict(api_keys)
     app=FastAPI(title="SpendLens API",version="1.0.0",
@@ -90,20 +93,36 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
     app.state.api_keys=configured
     app.state.rate_limit=rate_limit
     app.state.rate_window_seconds=rate_window_seconds
+    app.state.upload_rate_limit=upload_rate_limit
+    app.state.write_rate_limit=write_rate_limit
     request_times: dict[str,deque]=defaultdict(deque)
 
     @app.middleware("http")
     async def security_middleware(request: Request, call_next):
         client_ip=request.client.host if request.client else "unknown"
         now=time.monotonic()
-        bucket=request_times[client_ip]
-        while bucket and now-bucket[0]>=rate_window_seconds: bucket.popleft()
+        path=request.url.path
+        method=request.method.upper()
+        if path == "/v1/imports/analyze":
+            bucket_name="upload"; limit=upload_rate_limit
+        elif path.startswith("/v1/") and method in {"POST","PUT","PATCH","DELETE"}:
+            bucket_name="write"; limit=write_rate_limit
+        elif path.startswith("/v1/"):
+            bucket_name="read"; limit=rate_limit
+        else:
+            bucket_name=None; limit=None
         request_id=str(uuid.uuid4())
         started=time.perf_counter()
-        if len(bucket)>=rate_limit:
-            response=JSONResponse(status_code=429,content={"detail":"Rate limit exceeded"})
+        if bucket_name:
+            bucket=request_times[f"{client_ip}:{bucket_name}"]
+            while bucket and now-bucket[0]>=rate_window_seconds: bucket.popleft()
         else:
-            bucket.append(now)
+            bucket=None
+        if bucket is not None and len(bucket)>=limit:
+            retry_after=max(1,math.ceil(rate_window_seconds-(now-bucket[0])))
+            response=JSONResponse(status_code=429,content={"detail":"Rate limit exceeded","retry_after_seconds":retry_after},headers={"Retry-After":str(retry_after)})
+        else:
+            if bucket is not None: bucket.append(now)
             response=await call_next(request)
         response.headers["X-Request-ID"]=request_id
         logger.info("request_complete request_id=%s method=%s path=%s status=%s duration_ms=%.2f",
@@ -170,6 +189,24 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         if not db_path.exists(): return {"status":"degraded","service":"spendlens-api"}
         with connect(db_path) as c: c.execute("SELECT 1")
         return {"status":"ok","service":"spendlens-api"}
+
+    @app.post("/v1/imports/analyze")
+    async def analyse_expense_export(request: Request, file: UploadFile = File(...)):
+        """Screen a CSV/XLSX export during the request; no application import record is persisted."""
+        filename=file.filename or "expense-export"
+        try:
+            declared_size=int(request.headers.get("content-length") or 0)
+            if declared_size > MAX_UPLOAD_BYTES + 1024 * 1024:
+                raise HTTPException(413,"The upload request is too large. Files are limited to 10 MB.")
+            raw=await file.read(MAX_UPLOAD_BYTES+1)
+            if len(raw)>MAX_UPLOAD_BYTES:
+                raise HTTPException(413,"The file is larger than 10 MB. Split it into smaller files.")
+            try:
+                return analyse_upload(filename,raw)
+            except (ValueError,UnicodeError,BadZipFile) as exc:
+                raise HTTPException(422,str(exc)) from exc
+        finally:
+            await file.close()
 
     @app.get("/v1/summary")
     def summary(month:str|None=Query(None,pattern=r"^\d{4}-\d{2}$"),

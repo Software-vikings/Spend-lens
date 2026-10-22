@@ -66,7 +66,7 @@ def test_viewer_cannot_change_reviews(tmp_path):
       headers={"X-API-Key":VIEWER},json={"status":"under_review","reviewer":"Analyst A"})
     assert response.status_code==403
 
-def test_security_headers_and_rate_limit(tmp_path):
+def test_security_headers_and_route_aware_rate_limit(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS,rate_limit=2))
     first=client.get("/health")
     assert first.headers["X-Content-Type-Options"]=="nosniff"
@@ -75,8 +75,14 @@ def test_security_headers_and_rate_limit(tmp_path):
     assert "script-src 'self'" in csp
     assert "style-src 'self'" in csp
     assert "frame-ancestors 'none'" in csp
-    client.get("/health")
-    assert client.get("/health").status_code==429
+    headers={"X-API-Key":VIEWER}
+    assert client.get("/v1/summary",headers=headers).status_code==200
+    assert client.get("/v1/summary",headers=headers).status_code==200
+    blocked=client.get("/v1/summary",headers=headers)
+    assert blocked.status_code==429
+    assert int(blocked.headers["Retry-After"])>=1
+    # Static pages and health checks do not consume the API read budget.
+    assert client.get("/health").status_code==200
 
 def test_unconfigured_auth_fails_closed(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys={}))
@@ -98,7 +104,8 @@ def test_dashboard_and_assets_are_served(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
     page=client.get("/")
     assert page.status_code==200
-    assert "Spend overview" in page.text
+    assert "Upload your transaction file" in page.text
+    assert "SYNTHETIC DATA" not in page.text
     assert client.get("/assets/app.js").status_code==200
 
 def test_transaction_search_is_server_side_and_paged(tmp_path):
@@ -484,3 +491,67 @@ def test_exception_workflow_submission_assignment_resolution_and_audit(tmp_path)
     event_types={item["event_type"] for item in audit.json()["items"]}
     assert event_types=={"CLAIM_ASSIGNED","CLAIM_RESOLVED"}
     assert client.get("/v1/audit-events",headers={"X-API-Key":VIEWER}).status_code==403
+
+
+
+def test_upload_endpoint_analyzes_csv_without_api_key_and_does_not_persist(tmp_path):
+    import sqlite3
+    db,_=prepared_db(tmp_path)
+    with sqlite3.connect(db) as conn:
+        before=conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+    client=TestClient(create_app(db,api_keys=KEYS))
+    content=(
+      "Transaction Date,Merchant,Amount,Currency,Employee ID,Category,Transaction ID,Department\n"
+      "2026-10-01,Metro Hotel,145.00,INR,EMP-1,Travel,T-100,Finance\n"
+      "2026-10-01,Metro Hotel,145.00,INR,EMP-1,Travel,T-101,Finance\n"
+      "2026-10-02,City Cafe,35.50,INR,EMP-2,Meals,T-102,Sales\n"
+    )
+    response=client.post("/v1/imports/analyze",
+      files={"file":("company-expenses.csv",content,"text/csv")})
+    assert response.status_code==200
+    payload=response.json()
+    assert payload["summary"]["rows_analysed"]==3
+    assert payload["summary"]["possible_duplicate_groups"]==1
+    assert payload["summary"]["rows_with_signals"]==2
+    assert payload["data_coverage"]["columns_detected"]["merchant_name"]=="Merchant"
+    assert all(row["review_status"] in {"REVIEW","NO_FLAG"} for row in payload["items"])
+    with sqlite3.connect(db) as conn:
+        after=conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
+    assert after==before
+
+
+def test_upload_endpoint_rejects_unrecognised_columns(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    response=client.post("/v1/imports/analyze",
+      files={"file":("not-expenses.csv","foo,bar\n1,2\n","text/csv")})
+    assert response.status_code==422
+    assert "date column" in response.json()["detail"]
+
+
+def test_upload_endpoint_rejects_unsupported_extension(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    response=client.post("/v1/imports/analyze",
+      files={"file":("company-export.xls",b"some bytes","application/vnd.ms-excel")})
+    assert response.status_code==422
+    assert "CSV or XLSX" in response.json()["detail"]
+
+
+
+def test_upload_endpoint_accepts_xlsx_workbooks(tmp_path):
+    from datetime import date
+    from io import BytesIO
+    from openpyxl import Workbook
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    workbook=Workbook()
+    sheet=workbook.active
+    sheet.append(["Date","Merchant","Amount","Currency","Employee"])
+    sheet.append([date(2026,10,1),"Rail Services",72.50,"INR","EMP-100"])
+    sheet.append([date(2026,10,2),"City Cafe",28.00,"INR","EMP-101"])
+    stream=BytesIO();workbook.save(stream);workbook.close()
+    response=client.post("/v1/imports/analyze",
+      files={"file":("expenses.xlsx",stream.getvalue(),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert response.status_code==200
+    payload=response.json()
+    assert payload["summary"]["rows_analysed"]==2
+    assert payload["items"][0]["transaction_date"]=="2026-10-01"
+    assert payload["items"][0]["merchant_name"]=="Rail Services"

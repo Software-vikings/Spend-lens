@@ -1,110 +1,118 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#101b2d">
-  <title>SpendLens — Spend Intelligence</title>
+  <meta name="description" content="Screen expense exports, surface transaction anomalies and prepare a review-ready report.">
+  <title>SpendLens — Expense Intelligence</title>
   <link rel="stylesheet" href="/assets/styles.css">
 </head>
 <body>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand"><div class="brand-mark">S</div><div><b>spendlens</b><small>SPEND INTELLIGENCE</small></div></div>
-      <div class="workspace"><span class="dot"></span> Demo workspace <span class="chevron">⌄</span></div>
-      <nav><span class="nav-label">WORKSPACE</span><a class="nav-item active" href="#overview">▦ <span>Overview</span></a><a class="nav-item" href="#findings">◎ <span>Findings</span><span class="nav-count" id="nav-count">—</span></a><a class="nav-item" href="#transactions">▤ <span>Transactions</span></a><a class="nav-item" href="#decisions">✓ <span>Decisions</span><span class="nav-count" id="decision-count">0</span></a><a class="nav-item" href="#claims">▣ <span>Claims</span><span class="nav-count" id="claim-count">0</span></a><a class="nav-item" href="#queue">◷ <span>Exception queue</span><span class="nav-count" id="queue-count">0</span></a><a class="nav-item" href="#policies">⚙ <span>Policies</span></a><a class="nav-item" href="#audit">≡ <span>Audit trail</span></a></nav>
-      <div class="sidebar-bottom"><div class="secure-icon">⌑</div><b>Human-led decisions</b><p>Signals support review. They do not determine fraud or policy violations.</p><div class="api-status"><span class="dot red" id="connection-dot"></span><span id="connection-label">Not connected</span></div></div>
-    </aside>
-    <main class="main">
-      <header class="topbar"><div class="crumb">Workspace <span>/</span> <b id="crumb-title">Overview</b></div><div class="top-actions"><span class="demo-pill">SYNTHETIC DATA</span><button class="icon-btn" id="refresh-btn" title="Refresh data">↻</button><div class="avatar">SA</div></div></header>
-      <section class="page" id="overview">
-        <div class="page-heading"><div><div class="eyebrow">FINANCIAL INTELLIGENCE</div><h1>Spend overview</h1><p>Select a month, department or category to cross-filter the dashboard and transaction ledger.</p></div></div>
-        <div class="dashboard-filterbar"><span id="filter-summary" aria-live="polite">Showing all available transaction data</span><div><button class="secondary-btn small" id="clear-filters" disabled>Clear filters</button><button class="primary-btn compact-btn" id="view-filtered-transactions">View filtered transactions →</button></div></div>
-        <div class="metrics">
-          <article class="metric"><div class="metric-top"><span>Total spend</span><span class="metric-icon">€</span></div><strong id="total-spend">—</strong><small>Across recorded transactions</small></article>
-          <article class="metric clickable-metric" id="transaction-count-card" role="button" tabindex="0" aria-label="Open filtered transactions"><div class="metric-top"><span>Transactions <small class="metric-hint">Open ledger ↗</small></span><span class="metric-icon">↗</span></div><strong id="transaction-count">—</strong><small>Click to inspect matching records</small></article>
-          <article class="metric"><div class="metric-top"><span>Open findings <small class="metric-hint">Workspace-wide</small></span><span class="metric-icon amber">◎</span></div><strong id="open-findings">—</strong><small>Awaiting analyst action</small></article>
-          <article class="metric"><div class="metric-top"><span>Finding types</span><span class="metric-icon">⌘</span></div><strong id="finding-types">—</strong><small>Distinct signal categories</small></article>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="SpendLens home">
+      <span class="brand-mark">S</span>
+      <span><strong>spendlens</strong><small>EXPENSE INTELLIGENCE</small></span>
+    </a>
+    <div class="topbar-right"><span class="status-dot"></span><span>Private analysis session</span></div>
+  </header>
+
+  <main class="container">
+    <section class="intro">
+      <div class="eyebrow">TRANSACTION REVIEW WORKSPACE</div>
+      <h1>Bring your expense data.<br><span>Find what needs attention.</span></h1>
+      <p>Upload an expense or card-transaction export. SpendLens checks data quality, identifies possible duplicates and unusual amounts, and organises the results for human review.</p>
+    </section>
+
+    <section class="upload-card" aria-labelledby="upload-title">
+      <div class="upload-card-heading">
+        <div>
+          <div class="eyebrow">START AN ANALYSIS</div>
+          <h2 id="upload-title">Upload your transaction file</h2>
+          <p>Choose a CSV or Excel workbook exported from your expense, card or accounting system.</p>
         </div>
-        <div class="grid-main">
-          <article class="panel spend-panel"><div class="panel-head"><div><h2>Spend over time</h2><p>Monthly transaction value</p></div><span class="subtle-tag">EUR</span></div><div id="trend-chart" class="trend-chart"><div class="empty">Connect to load analytics</div></div></article>
-          <article class="panel"><div class="panel-head"><div><h2>Spend by department</h2><p>Where spend is concentrated</p></div></div><div id="department-chart" class="bar-list"></div></article>
+        <div class="file-type-mark" aria-hidden="true">CSV<br><span> XLSX</span></div>
+      </div>
+
+      <input id="file-input" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
+      <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Choose an expense file or drop it here">
+        <div class="upload-icon" aria-hidden="true">↑</div>
+        <strong>Drop your file here</strong>
+        <span>or <button type="button" class="browse-link" id="browse-button">browse files</button></span>
+        <small>CSV or XLSX · Maximum file size 10 MB · Up to 10,000 rows</small>
+      </div>
+
+      <div id="selected-file" class="selected-file hidden">
+        <span class="file-icon">▤</span>
+        <div class="selected-file-copy"><strong id="file-name"></strong><small id="file-size"></small></div>
+        <button type="button" class="remove-file" id="remove-file" aria-label="Remove selected file">×</button>
+      </div>
+
+      <div class="upload-actions">
+        <p class="privacy-note"><span aria-hidden="true">▣</span> File contents are processed for this analysis and are not added to a saved workspace or database.</p>
+        <button id="analyse-button" class="primary-button" type="button" disabled>Analyse transactions <span>→</span></button>
+      </div>
+      <div id="upload-message" class="upload-message" role="status" aria-live="polite"></div>
+    </section>
+
+    <section id="results" class="results hidden" aria-live="polite">
+      <div class="results-heading">
+        <div><div class="eyebrow">ANALYSIS COMPLETE</div><h2>Transaction review</h2><p id="results-subtitle"></p></div>
+        <div class="results-actions">
+          <button id="download-report" class="secondary-button" type="button">↓ Download review file</button>
+          <button id="new-analysis" class="secondary-button" type="button">New analysis</button>
         </div>
-        <div class="grid-bottom">
-          <article class="panel"><div class="panel-head"><div><h2>Latest findings</h2><p>Signals that may need attention</p></div><a href="#findings" class="text-link">View all →</a></div><div id="latest-findings" class="finding-list"><div class="empty">No data loaded</div></div></article>
-          <article class="panel"><div class="panel-head"><div><h2>Top spend categories</h2><p>By recorded transaction value</p></div></div><div id="category-list" class="category-list"></div></article>
+      </div>
+
+      <div class="metric-grid">
+        <article class="metric-card"><span>Rows analysed</span><strong id="metric-rows">0</strong><small>Usable transaction records</small></article>
+        <article class="metric-card warning"><span>Rows needing review</span><strong id="metric-review">0</strong><small>At least one screening signal</small></article>
+        <article class="metric-card"><span>Possible duplicate groups</span><strong id="metric-duplicates">0</strong><small>Matching transaction patterns</small></article>
+        <article class="metric-card"><span>Invalid rows</span><strong id="metric-invalid">0</strong><small>Could not be analysed</small></article>
+      </div>
+
+      <div class="results-grid">
+        <article class="panel">
+          <div class="panel-heading"><div><h3>Expense totals</h3><p>Positive transaction amounts, grouped by currency</p></div></div>
+          <div id="currency-totals" class="currency-totals"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-heading"><div><h3>Data coverage</h3><p>Columns identified in your file</p></div></div>
+          <div id="coverage" class="coverage-list"></div>
+        </article>
+      </div>
+
+      <article class="panel review-panel">
+        <div class="review-heading">
+          <div><h3>Transaction review list</h3><p>Review signals are leads for investigation, not findings of fraud.</p></div>
+          <div class="review-controls">
+            <input id="search-results" type="search" placeholder="Search merchant or transaction">
+            <select id="filter-results" aria-label="Filter transactions"><option value="all">All rows</option><option value="review">Needs review</option><option value="clear">No signal detected</option></select>
+          </div>
         </div>
-      </section>
-      <section class="page hidden" id="findings">
-        <div class="page-heading"><div><div class="eyebrow">REVIEW QUEUE</div><h1>Findings</h1><p>Investigate unusual patterns with supporting transaction context.</p></div></div>
-        <div class="toolbar"><input id="finding-search" placeholder="Search this page: merchant, type or finding ID"><select id="finding-status"><option value="">All statuses</option><option>new</option><option>under_review</option><option>confirmed</option><option>dismissed</option><option>resolved</option></select><button class="secondary-btn" id="findings-refresh">Refresh findings</button></div>
-        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Finding</th><th>Merchant / signal</th><th>Amount</th><th>Occurrences</th><th>Status</th><th></th></tr></thead><tbody id="findings-table"><tr><td colspan="6" class="empty">Connect to load findings</td></tr></tbody></table></div><div class="pagination"><span id="finding-page-label">—</span><div><button class="secondary-btn small" id="finding-prev" disabled>Previous</button><button class="secondary-btn small" id="finding-next" disabled>Next</button></div></div></div>
-      </section>
-      <section class="page hidden" id="decisions">
-        <div class="page-heading"><div><div class="eyebrow">AUTOMATED POLICY EVALUATION</div><h1>Expense decisions</h1><p>Evaluate a claim against the versioned synthetic policy. Exceptions and missing evidence are not silently approved.</p></div></div>
-        <div class="decision-layout">
-          <article class="panel decision-form-panel">
-            <div class="panel-head"><div><h2>New expense claim</h2><p>Enter the information normally captured from an employee submission.</p></div><span class="subtle-tag">EXAMPLE POLICY</span></div>
-            <div class="policy-context"><b>What happens when you submit?</b><span>SpendLens checks required details, category eligibility, configured limits and receipt evidence. It records an outcome and explains each rule. It does not read or verify an actual receipt image yet.</span></div>
-            <form id="expense-evaluation-form" class="decision-form">
-              <div class="form-section-label wide">EMPLOYEE & TRANSACTION</div>
-              <label>Claim reference<input name="expense_id" placeholder="e.g. EXP-2026-001" required></label>
-              <label>Employee ID<input name="employee_id" placeholder="e.g. EMP-1042" required></label>
-              <label>Merchant / supplier<input name="merchant_name" placeholder="e.g. City Centre Hotel" required></label>
-              <label>Department<input name="department" placeholder="e.g. Sales" required></label>
-              <label>Expense date<input name="transaction_date" type="date" required></label>
-              <label>Amount claimed<input name="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></label>
-              <label>Currency<select name="currency"><option>EUR</option><option>USD</option><option>GBP</option><option>INR</option></select></label>
-              <label>Expense category<select name="category" required><option value="">Choose a category</option><option>Meals</option><option>Software</option><option>Office Supplies</option><option>Travel</option><option>Training</option><option>Personal Entertainment</option></select></label>
-              <label class="wide">Business purpose<textarea name="business_purpose" rows="2" placeholder="Explain why this expense was necessary for work…" required></textarea></label>
-              <div class="form-section-label wide">RECEIPT EVIDENCE</div>
-              <label>Receipt status<select name="receipt_status"><option value="provided">Receipt supplied</option><option value="missing">No receipt supplied</option><option value="unreadable">Receipt supplied but unreadable</option></select></label>
-              <label>Receipt reference<input name="receipt_id" placeholder="Reference / attachment ID"></label>
-              <label>Receipt total<input name="receipt_total" type="number" min="0" step="0.01" placeholder="Enter total printed on receipt"></label>
-              <label class="check-field"><input name="duplicate_suspected" type="checkbox"> Include duplicate-risk signal (demo)</label>
-              <p class="field-note wide">Receipt images are not uploaded or OCR-verified in this prototype. Receipt status and total are user-entered evidence metadata. The duplicate-risk checkbox is a simulated input, not an automatic duplicate detector.</p>
-              <button class="primary-btn wide" type="submit" id="evaluate-expense-btn">Run policy checks and record decision →</button>
-            </form>
-            <p class="decision-disclaimer">This is a synthetic example policy, not your employer's policy. A decision is only as reliable as the policy and evidence supplied.</p>
-          </article>
-          <article class="panel decision-result-panel"><div class="panel-head"><div><h2>Decision result</h2><p>Outcome, reason and checks applied to this claim.</p></div></div><div id="decision-result" class="empty">No claim evaluated yet. Complete the form to see the system's decision and the policy rules behind it.</div></article>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Date</th><th>Merchant / payee</th><th>Category</th><th class="numeric">Amount</th><th>Status</th><th>Reason</th></tr></thead>
+            <tbody id="results-table"><tr><td colspan="6" class="table-empty">No results yet.</td></tr></tbody>
+          </table>
         </div>
-        <article class="panel table-panel decisions-table-panel"><div class="panel-head"><div><h2>Decision register</h2><p>Every evaluation is recorded here, including exceptions and incomplete claims.</p></div><button class="secondary-btn" id="decisions-refresh">Refresh register</button></div><div class="table-wrap"><table><thead><tr><th>Expense</th><th>Decision</th><th>Policy version</th><th>Evaluated at</th><th></th></tr></thead><tbody id="decisions-table"><tr><td colspan="5" class="empty">No decisions yet</td></tr></tbody></table></div><div class="pagination"><span id="decision-page-label">—</span><div><button class="secondary-btn small" id="decision-prev" disabled>Previous</button><button class="secondary-btn small" id="decision-next" disabled>Next</button></div></div></article>
-      </section>
-      <section class="page hidden" id="claims">
-        <div class="page-heading"><div><div class="eyebrow">EXPENSE OPERATIONS</div><h1>Expense claims</h1><p>One durable claim record per claim reference, with submitted versions, linked decisions and receipt metadata history.</p></div></div>
-        <div class="toolbar"><select id="claim-status"><option value="">All latest outcomes</option><option>APPROVE</option><option>REJECT</option><option>REVIEW</option><option>INSUFFICIENT_DATA</option></select><button class="secondary-btn" id="claims-refresh">Refresh claims</button></div>
-        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Claim reference</th><th>Employee</th><th>Merchant</th><th>Department</th><th>Amount</th><th>Latest outcome</th><th>Updated</th><th></th></tr></thead><tbody id="claims-table"><tr><td colspan="8" class="empty">No expense claims recorded</td></tr></tbody></table></div><div class="pagination"><span id="claim-page-label">—</span><div><button class="secondary-btn small" id="claim-prev" disabled>Previous</button><button class="secondary-btn small" id="claim-next" disabled>Next</button></div></div></div>
-        <p class="field-note">Receipt records currently contain submitted metadata and references only. Actual file storage, OCR and receipt authenticity checks are not implemented.</p>
-      </section>
-      <section class="page hidden" id="queue">
-        <div class="page-heading"><div><div class="eyebrow">ANALYST OPERATIONS</div><h1>Exception queue</h1><p>Prioritise unresolved claims, track reviewer ownership and work to explicit SLA deadlines.</p></div><button class="secondary-btn" id="queue-refresh">Refresh queue</button></div>
-        <div class="queue-metrics"><article class="panel"><small>Open exceptions</small><strong id="queue-open-count">—</strong></article><article class="panel"><small>Assigned</small><strong id="queue-assigned-count">—</strong></article><article class="panel"><small>Unassigned</small><strong id="queue-unassigned-count">—</strong></article><article class="panel"><small>Overdue</small><strong id="queue-overdue-count">—</strong></article></div>
-        <div class="toolbar queue-filters"><select id="queue-status"><option value="">All exception states</option><option>REVIEW</option><option>INSUFFICIENT_DATA</option><option>AWAITING_INFORMATION</option></select><input id="queue-assignee" placeholder="Filter by assignee"><select id="queue-priority"><option value="">All priorities</option><option>URGENT</option><option>HIGH</option><option>NORMAL</option><option>LOW</option></select><select id="queue-overdue"><option value="">All deadlines</option><option value="true">Overdue only</option><option value="false">Not overdue</option></select><select id="queue-sort" aria-label="Sort exception queue"><option value="priority">Sort: Priority</option><option value="sla">Sort: SLA deadline</option><option value="newest">Sort: Newest first</option></select></div>
-        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Claim</th><th>Merchant / department</th><th>Amount</th><th>Workflow status</th><th>Assignee</th><th>Priority</th><th>SLA deadline</th><th></th></tr></thead><tbody id="queue-table"><tr><td colspan="8" class="empty">Connect to load exception queue</td></tr></tbody></table></div><div class="pagination"><span id="queue-page-label">—</span><div><button class="secondary-btn small" id="queue-prev" disabled>Previous</button><button class="secondary-btn small" id="queue-next" disabled>Next</button></div></div></div>
-        <p class="field-note">SLA clocks begin when a reviewer assignment is recorded. Unassigned exceptions have no deadline. Assignment names are self-reported in this prototype.</p>
-      </section>
-      <section class="page hidden" id="policies">
-        <div class="page-heading"><div><div class="eyebrow">GOVERNANCE</div><h1>Policy administration</h1><p>Review immutable policy versions, create a new version and activate the version used for future decisions.</p></div><button class="secondary-btn" id="policies-refresh">Refresh policies</button></div>
-        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Policy</th><th>Version</th><th>Created</th><th>Activation</th><th>Status</th><th></th></tr></thead><tbody id="policies-table"><tr><td colspan="6" class="empty">Connect to load policy versions</td></tr></tbody></table></div></div>
-        <div class="panel" style="margin-top:18px;padding:20px"><div class="panel-heading"><div><h2>Create a policy version</h2><p>Start from an existing version, change its version number and policy values, then save. Existing versions cannot be edited.</p></div></div><textarea id="policy-editor" rows="18" spellcheck="false" style="width:100%;font-family:monospace"></textarea><div class="toolbar"><button class="primary-btn" id="policy-save">Save new version</button><span class="field-note" id="policy-editor-status">Requires an admin API key. Saving does not activate the version.</span></div></div>
-        <p class="field-note">Policy changes apply only to evaluations after activation. Each decision stores its policy ID and version. This prototype has no approval workflow for policy changes or multi-tenant policy assignment.</p>
-      </section>
-      <section class="page hidden" id="transactions">
-        <div class="page-heading"><div><div class="eyebrow">LEDGER EXPLORER</div><h1>Transactions</h1><p>Explore the underlying synthetic records. Selections here also filter the overview dashboard.</p></div></div>
-        <div class="toolbar"><input id="transaction-search" placeholder="Search merchant, employee or transaction ID"><select id="transaction-month"><option value="">All months</option></select><select id="transaction-department"><option value="">All departments</option></select><select id="transaction-category"><option value="">All categories</option></select><button class="secondary-btn" id="transactions-refresh">Refresh</button></div>
-        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Merchant</th><th>Department</th><th>Category</th><th>Employee</th><th class="right">Amount</th></tr></thead><tbody id="transactions-table"><tr><td colspan="6" class="empty">Connect to load transactions</td></tr></tbody></table></div><div class="pagination"><span id="transaction-page-label">—</span><div><button class="secondary-btn small" id="prev-page">Previous</button><button class="secondary-btn small" id="next-page">Next</button></div></div></div>
-      </section>
-      <section class="page hidden" id="audit">
-        <div class="page-heading"><div><div class="eyebrow">GOVERNANCE & CONTROL</div><h1>Audit trail</h1><p>Chronological record of policy administration and exception-handling actions.</p></div><button class="secondary-btn" id="audit-refresh">Refresh audit trail</button></div>
-        <div class="toolbar"><select id="audit-event-filter"><option value="">All event types</option><option>CLAIM_ASSIGNED</option><option>CLAIM_RESOLVED</option><option>POLICY_CREATED</option><option>POLICY_ACTIVATED</option><option>FINDING_REVIEW_UPDATED</option></select><input id="audit-entity-id" placeholder="Filter by claim or policy ID"><button class="secondary-btn" id="audit-apply">Apply filters</button></div>
-        <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Time</th><th>Action</th><th>Entity</th><th>Actor / reviewer</th><th>Details</th></tr></thead><tbody id="audit-table"><tr><td colspan="5" class="empty">Connect with an admin key to view audit events</td></tr></tbody></table></div><div class="pagination"><span id="audit-page-label">—</span><div><button class="secondary-btn small" id="audit-prev" disabled>Previous</button><button class="secondary-btn small" id="audit-next" disabled>Next</button></div></div></div>
-        <p class="field-note">Admin-only view. Records are append-only in the application interface; this prototype is not a tamper-proof compliance log.</p>
-      </section>
-      <footer>SpendLens <span>•</span> Synthetic demonstration environment <span class="footer-right">A flag is a review signal, not a verdict.</span></footer>
-    </main>
-  </div>
-  <div class="connect-overlay" id="connect-overlay"><div class="connect-card"><div class="brand large"><div class="brand-mark">S</div><div><b>spendlens</b><small>SPEND INTELLIGENCE</small></div></div><div class="eyebrow">ANALYST WORKSPACE</div><h1>See the story behind spend.</h1><p>Connect with your local SpendLens API to explore spending patterns and review findings.</p><label for="api-key">API key</label><input id="api-key" type="password" placeholder="Paste your viewer or analyst API key" autocomplete="off"><div class="connect-error" id="connect-error"></div><button class="primary-btn" id="connect-btn">Connect to workspace <span>→</span></button><small class="privacy-note">Your key is held in this browser tab only and is not sent anywhere except this local API.</small></div></div>
-  <div class="drawer-backdrop hidden" id="drawer-backdrop"><aside class="detail-drawer"><button class="close-btn" id="drawer-close">×</button><div id="finding-detail"><div class="empty">Select a finding</div></div></aside></div>
-  <div class="toast" id="toast"></div>
-  <script src="/assets/app.js"></script>
-</body></html>
+        <div id="table-count" class="table-count"></div>
+      </article>
+
+      <div id="row-errors" class="panel errors-panel hidden">
+        <h3>Rows that could not be analysed</h3>
+        <p>Correct these source rows and upload the revised file to include them.</p>
+        <ul id="error-list"></ul>
+      </div>
+
+      <div class="interpretation">
+        <div class="interpretation-icon">i</div>
+        <div><strong>What these results mean</strong><p id="limitations-copy"></p><p>SpendLens does not automatically approve or reject expenses. An unflagged transaction is not proof that an expense is legitimate. To test policy compliance, the organisation's authorised expense policy must also be supplied and configured.</p></div>
+      </div>
+    </section>
+
+    <footer class="footer"><span>SpendLens</span><span>Evidence-led expense review</span><span>Human judgement stays in control</span></footer>
+  </main>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
