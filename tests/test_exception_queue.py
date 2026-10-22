@@ -80,3 +80,23 @@ def test_claim_assignment_history_and_queue_metrics_span_pages(tmp_path):
     assert page["metrics"] == {"assigned": 1, "unassigned": 2, "overdue": 0}
     filtered = client.get("/v1/exception-queue?assignee=Analyst%20Two", headers={"X-API-Key": VIEWER}).json()
     assert filtered["metrics"] == {"assigned": 1, "unassigned": 0, "overdue": 0}
+
+
+def test_exception_queue_sort_modes(tmp_path):
+    db, _ = prepared_db(tmp_path)
+    client = TestClient(create_app(db, api_keys=KEYS))
+    headers = {"X-API-Key": ANALYST}
+    for expense_id in ("SORT-OLD", "SORT-NEW"):
+        expense = {"expense_id": expense_id, "employee_id": expense_id,
+                   "merchant_name": "Cafe", "department": "Sales",
+                   "amount": "85.00", "currency": "EUR", "category": "Meals",
+                   "transaction_date": "2026-05-20", "business_purpose": "Lunch",
+                   "receipt": {"provided": False}}
+        assert client.post("/v1/expenses/evaluate", headers=headers,
+                           json={"expense": expense}).status_code == 200
+    normal = client.get("/v1/exception-queue?sort=priority", headers=headers).json()
+    sla = client.get("/v1/exception-queue?sort=sla", headers=headers).json()
+    newest = client.get("/v1/exception-queue?sort=newest", headers=headers).json()
+    assert len(normal["items"]) == len(sla["items"]) == len(newest["items"]) == 2
+    invalid = client.get("/v1/exception-queue?sort=arbitrary", headers=headers)
+    assert invalid.status_code == 422
