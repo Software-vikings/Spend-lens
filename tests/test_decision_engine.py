@@ -8,7 +8,7 @@ POLICY = json.loads((Path(__file__).parents[1] / "policies" / "demo_policy.json"
 
 def expense(**changes):
     value = {
-        "expense_id": "EXP-001", "amount": "85.00", "currency": "EUR",
+        "expense_id": "EXP-001", "employee_id": "EMP-1001", "merchant_name": "City Cafe", "department": "Sales", "amount": "85.00", "currency": "EUR",
         "category": "Meals", "transaction_date": "2026-05-14",
         "business_purpose": "Client project working lunch",
         "receipt": {"provided": True, "readable": True, "receipt_id": "R-001", "total": "85.00"},
