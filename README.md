@@ -1,104 +1,69 @@
 # SpendLens
 
-**Policy-based expense decision and exception-operations prototype.**
+**Upload-first expense review and transaction screening.**
 
-SpendLens evaluates submitted expense claims against a versioned, configurable **synthetic demonstration policy**. It returns one of four outcomes—`APPROVE`, `REJECT`, `REVIEW` or `INSUFFICIENT_DATA`—with rule-level explanations, persists decisions, and routes exceptions through an assignment and human-resolution workflow.
+SpendLens turns an employer's transaction export into an explainable review list. Upload a CSV or Excel workbook, inspect the records that need attention, and download a review file for the finance team.
 
-This is an independent portfolio project. It is **not** connected to Pleo, a bank, an accounting platform or any real financial institution.
+## What the upload workflow does
 
-> **Demo-data boundary:** the transaction ledger and example policy are synthetic. Findings and duplicate candidates are screening signals, not proof of fraud, policy violations or savings. Do not use real employee or financial data.
+- Accepts .csv and .xlsx files up to 10 MB and 10,000 data rows.
+- Automatically recognises common transaction-export headings for date, merchant/payee, amount, currency, employee, department, category, payment method and receipt/invoice reference.
+- Validates required fields and reports rows that could not be analysed.
+- Identifies possible duplicates based on employee (when supplied), merchant, date, amount and currency.
+- Screens for unusually high amounts within merchant/category/currency groups when there are at least nine comparable records. The screen uses a robust median/MAD score.
+- Flags future-dated records for checking and keeps negative-value credits/refunds visible.
+- Shows data coverage, currency totals, row-level explanations and a downloadable CSV review report.
 
-## Implemented capabilities
+The upload workflow analyses the submitted file in memory. It does not insert uploaded rows into the existing application database or retain a saved import history. Results are held in the current browser page and are cleared when the page is refreshed.
 
-- Deterministic expense evaluation against versioned policy documents, with explicit rule results and explanations.
-- Four distinct decision outcomes; missing or unreliable required information is not silently approved.
-- Persisted decisions, claims, submission history and receipt/evidence metadata.
-- Decision history with policy and engine version references.
-- Policy version creation and activation, with admin-only controls and audit events.
-- Exception queue with assignment/reassignment, priority, SLA deadlines, queue-wide metrics, sorting, filtering and pagination.
-- Human exception actions: request information, approve or reject. Human resolution history is preserved separately from the original automated outcome; terminal resolutions cannot be overwritten.
-- Transaction dashboard with month, department and category filtering; spend charts, ledger search, pagination and transaction detail.
-- Findings review workspace and audit trail for policy administration, claim assignment/resolution and finding review actions.
-- Exact transaction-to-finding drill-through only where the source finding carries the matching transaction ID.
-- API-key roles, input validation, parameterised SQL, request throttling, security headers and database-backed idempotency for expense evaluation.
-- Automated tests for decision rules, role access, audit atomicity, exception lifecycle, dashboard aggregates, pagination and concurrent idempotent submissions.
+## What it does not claim
 
-## Decision semantics
+A transaction export alone cannot prove that a payment happened, that a receipt is genuine, that a named employee made the purchase, or that an expense is legitimate. Similar transactions may be valid recurring purchases; an unusual amount may have a reasonable explanation.
 
-| Outcome | Meaning |
-|---|---|
-| `APPROVE` | Required inputs/evidence are present and the configured policy checks pass. |
-| `REJECT` | A configured deterministic hard-stop rule is conclusively violated. |
-| `REVIEW` | An exception or ambiguous/risk signal requires human assessment. |
-| `INSUFFICIENT_DATA` | Required information is missing or not reliable enough to evaluate. |
-
-An anomaly or duplicate-candidate signal does not, by itself, cause automatic rejection. The included policy is illustrative and must not be represented as any employer's actual policy.
+The current upload workflow is a screening tool, not a fraud adjudicator:
+- A possible duplicate or unusual amount is a lead for human review.
+- A row with no screening signal is not automatically approved.
+- Employer-specific policy compliance is not yet evaluated by the upload workflow. That requires the organisation's authorised policy rules to be configured and applied, rather than assuming example thresholds are correct.
+- Receipt authenticity and bank/card settlement verification require source-system evidence or integrations that are not part of this upload release.
 
 ## Run locally
 
 Requires Python 3.10+.
 
-```bash
-git clone https://github.com/Software-vikings/Spend-lens.git
-cd Spend-lens
+    git clone https://github.com/Software-vikings/Spend-lens.git
+    cd Spend-lens
+    python -m venv .venv
+    source .venv/bin/activate        # Windows: .venv\Scripts\activate
+    pip install -r requirements.txt
+    PYTHONPATH=src uvicorn spendlens.api:app --host 127.0.0.1 --port 8000
 
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
+Open http://127.0.0.1:8000. The upload workflow does not ask visitors for an API key.
 
-PYTHONPATH=src python -m spendlens.pipeline
-PYTHONPATH=src python -m spendlens.validation
-PYTHONPATH=src pytest -q
-```
+The repository retains protected operational API routes for the policy, decision and exception-management prototype. Those routes use API-key roles; configure them with the SPENDLENS_API_KEYS environment variable only when using those internal endpoints. The browser upload workspace does not expose or ask users to enter those keys.
 
-Configure at least one long random API key (24+ characters) and start the API:
+## Upload API
 
-```bash
-export SPENDLENS_API_KEYS="YOUR_LONG_RANDOM_KEY:analyst,ANOTHER_LONG_RANDOM_KEY:viewer"
-PYTHONPATH=src uvicorn spendlens.api:app --host 127.0.0.1 --port 8000
-```
+POST /v1/imports/analyze accepts one multipart file field named file. It returns:
+- detected source-column mappings;
+- records analysed and row-level input errors;
+- duplicate and unusual-amount review signals;
+- positive totals grouped by currency;
+- a list of limitations that accompany the results.
 
-Open http://127.0.0.1:8000 and enter the API key. The dashboard retains it in the current browser tab's session storage. Never commit real keys.
+The route is intentionally stateless and does not write the source file or imported rows to the application database.
 
-## Roles and key API areas
+## Rate limiting
 
-- **Viewer:** read-only access to permitted dashboard, transaction, claim, decision and queue data.
-- **Analyst:** expense evaluation, finding review and exception assignment/resolution.
-- **Admin:** policy administration and audit-event access, in addition to permitted operational actions.
+The API uses separate per-client-IP request budgets rather than one counter for every website request:
+- Upload analysis: 10 requests per 60 seconds.
+- State-changing API requests: 60 per 60 seconds.
+- Read-only API requests: 600 per 60 seconds.
+- Static website assets and the health endpoint do not consume these API budgets.
 
-Key API routes include:
+A 429 response includes a Retry-After header. The in-memory limiter is process-local and is not a distributed production rate limiter.
 
-- `GET /health`
-- `GET /v1/summary`, `GET /v1/analytics/overview`
-- `GET /v1/transactions`, `GET /v1/transactions/{transaction_id}`
-- `POST /v1/expenses/evaluate` (supports `Idempotency-Key`)
-- `GET /v1/decisions`, `GET /v1/decisions/{decision_id}`
-- `GET /v1/claims`, `GET /v1/claims/{claim_id}`
-- `GET /v1/exception-queue`
-- `POST /v1/claims/{claim_id}/assignment`
-- `POST /v1/claims/{claim_id}/resolution`
-- `GET /v1/policies`, `POST /v1/policies`, `POST /v1/policies/{policy_id}/{version}/activate`
-- `GET /v1/audit-events` (admin-only)
-- `GET /v1/findings`, `PATCH /v1/findings/{finding_id}/review`
+## Security and data handling
 
-Consult the route definitions in `src/spendlens/api.py` for request schemas and supported query parameters.
+The uploaded file is received by the server for processing, so the server hosting SpendLens can access its contents during the request even though the application does not persist it. Use HTTPS in any hosted environment. Do not upload sensitive business or employee data to a public instance until the organisation has approved the hosting, access, retention and privacy arrangements.
 
-## Verification
-
-The rebuild branch has automated coverage for the API, policy engine, exception workflow, audit history, dashboard aggregates, role permissions, idempotency and concurrent submissions. CI runs tests, the synthetic data pipeline, multi-seed validation, Python compilation and dashboard JavaScript syntax checks.
-
-Automated CI does **not** establish visual/browser acceptance, production security, deployment correctness or real-world policy effectiveness. Browser-based end-to-end verification has not been performed.
-
-## Explicit limitations and production gaps
-
-- Synthetic transactions and a synthetic example policy only; no employer policy discovery or real-world policy validation.
-- Receipt handling stores user-entered metadata only. No file upload, OCR, authenticity checks or independent evidence verification.
-- Reviewer/assignee names are self-reported; API-key roles are not an enterprise identity system.
-- No Pleo, bank, card, ERP or accounting integrations; no payment execution.
-- No tenant isolation, SSO/MFA, distributed rate limiting, managed secrets, formal penetration test or independent security review.
-- No verified production deployment, Docker runtime validation, backup/restore exercise or operational monitoring.
-- Findings are workspace-wide where a trustworthy transaction-level relationship is unavailable; related records are not inferred from matching amounts/dates.
-- The audit trail is transactionally written for supported audited actions, but is not cryptographically tamper-evident and does not prove the identity of the named human actor.
-- No browser interaction suite or visual regression evidence is claimed.
-
-See [SECURITY.md](SECURITY.md) before running outside a local demo environment. This repository is a portfolio prototype, **not a production-certified financial control platform**.
+See SECURITY.md for the current controls and remaining production work. This repository is a portfolio prototype, not a production-certified financial control platform.
