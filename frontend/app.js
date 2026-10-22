@@ -192,6 +192,7 @@
   $("clear-filters").addEventListener("click",async()=>{state.filters={month:"",department:"",category:""};state.page=0;await refreshAll();});
   $("decisions-table").addEventListener("click",e=>{const b=e.target.closest("[data-decision-id]");if(b)showDecision(b.dataset.decisionId);});
   $("decisions-refresh").addEventListener("click",async()=>{try{const d=await api("/v1/decisions?limit=100");state.decisions=d.items||[];renderDecisions();$("decision-count").textContent=number(d.total||0);}catch(e){toast(e.message);}});
+  let pendingIdempotencyKey=null;
   $("expense-evaluation-form").addEventListener("submit",async e=>{
     e.preventDefault();
     const form=new FormData(e.currentTarget);
@@ -200,10 +201,11 @@
     const receipt={provided:receiptStatus!=="missing",readable:receiptStatus==="provided",receipt_id:String(form.get("receipt_id")||"").trim()||null,total:String(form.get("receipt_total")||"").trim()||null};
     const expense={expense_id:String(form.get("expense_id")).trim(),employee_id:String(form.get("employee_id")).trim(),merchant_name:String(form.get("merchant_name")).trim(),department:String(form.get("department")).trim(),amount:amount,currency:form.get("currency"),category:form.get("category"),transaction_date:form.get("transaction_date"),business_purpose:String(form.get("business_purpose")).trim(),receipt,duplicate_suspected:form.get("duplicate_suspected")==="on"};
     try{
-      const result=await api("/v1/expenses/evaluate",{method:"POST",body:JSON.stringify({expense})});
+      pendingIdempotencyKey=pendingIdempotencyKey||crypto.randomUUID();
+      const result=await api("/v1/expenses/evaluate",{method:"POST",headers:{"Idempotency-Key":pendingIdempotencyKey},body:JSON.stringify({expense})});
       $("decision-result").innerHTML='<div class="empty">Decision recorded. Loading rule-level explanation…</div>';
       const list=await api("/v1/decisions?limit=100");state.decisions=list.items||[];renderDecisions();$("decision-count").textContent=number(list.total||0);
-      await showDecision(result.decision_id);toast("Expense evaluated and decision saved.");
+      await showDecision(result.decision_id);pendingIdempotencyKey=null;toast("Expense evaluated and decision saved.");
     }catch(err){toast(err.message==="Insufficient role"?"Expense evaluation requires an analyst API key. Reconnect with analyst access.":err.message);}
   });
   $("connect-btn").addEventListener("click",connect);
