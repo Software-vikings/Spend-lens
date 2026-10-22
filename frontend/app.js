@@ -96,16 +96,10 @@
     $("findings-table").querySelectorAll("[data-open]").forEach(el=>el.addEventListener("click",()=>openFinding(el.dataset.open)));
   };
   const loadTransactions = async () => {
-    const dept=$("transaction-department").value,cat=$("transaction-category").value;
     const qs=new URLSearchParams({limit:state.pageSize,offset:state.page*state.pageSize});
     Object.entries(state.filters).forEach(([key,value])=>{if(value)qs.set(key,value);});
-    if(dept)qs.set("department",dept);if(cat)qs.set("category",cat);
     const search=$("transaction-search").value.trim();if(search)qs.set("q",search);
     const data=await api("/v1/transactions?"+qs.toString());state.transactions=data.items||[];state.total=data.total||0;
-    const departments=(state.overview?.departments||[]).map(x=>x.department).sort();
-    const categories=(state.overview?.categories||[]).map(x=>x.category).sort();
-    if(!$("transaction-department").dataset.ready){$("transaction-department").innerHTML='<option value="">All departments</option>'+departments.map(x=>`<option>${esc(x)}</option>`).join("");$("transaction-department").dataset.ready="1";}
-    if(!$("transaction-category").dataset.ready){$("transaction-category").innerHTML='<option value="">All categories</option>'+categories.map(x=>`<option>${esc(x)}</option>`).join("");$("transaction-category").dataset.ready="1";}
     renderTransactions();
   };
   const renderTransactions = () => {
