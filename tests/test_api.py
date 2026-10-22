@@ -187,3 +187,24 @@ def test_finding_detail_requires_authentication_and_allows_viewer(tmp_path):
     assert client.get(url).status_code == 401
     assert client.get(url,headers={"X-API-Key":"invalid-key"}).status_code == 401
     assert client.get(url,headers={"X-API-Key":VIEWER}).status_code == 200
+
+
+def test_backend_flags_matching_prior_expense_for_review(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":ANALYST}
+    first={"expense_id":"EXP-DUP-001","employee_id":"EMP-77","merchant_name":"City Cafe",
+      "department":"Sales","amount":"85.00","currency":"EUR","category":"Meals",
+      "transaction_date":"2026-05-14","business_purpose":"Project lunch",
+      "receipt":{"provided":True,"readable":True,"receipt_id":"R-DUP-001","total":"85.00"}}
+    first_result=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":first})
+    assert first_result.status_code == 200
+    assert first_result.json()["outcome"] == "APPROVE"
+
+    second=dict(first,expense_id="EXP-DUP-002",receipt=dict(first["receipt"],receipt_id="R-DUP-002"))
+    second_result=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":second})
+    assert second_result.status_code == 200
+    saved=second_result.json()
+    assert saved["outcome"] == "REVIEW"
+    risk_rule=next(rule for rule in saved["evaluation"]["evaluated_rules"] if rule["rule_id"]=="RISK-001")
+    assert risk_rule["status"] == "REVIEW"
+    assert risk_rule["evidence"]["match"]["prior_expense_id"] == "EXP-DUP-001"
