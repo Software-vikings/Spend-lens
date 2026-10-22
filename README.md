@@ -8,7 +8,7 @@ SpendLens is being rebuilt to evaluate synthetic expense claims against explicit
 
 ## Current implementation status
 
-The repository's main-branch foundation generates synthetic transactions, screens statistical/heuristic signals and serves a basic overview/findings/transactions dashboard. The rebuild branch now adds an initial deterministic policy evaluator, a synthetic versioned policy, persisted decision APIs and an expense-decision workbench. The initial decision-engine slice is CI-verified. The latest branch also includes a micro-detail dashboard and claim-intake pass; its CI and browser verification are pending. **This is a first vertical slice, not a complete product:** claim/evidence domain modelling, policy management, authorised overrides, end-to-end lifecycle and the full state-driven dashboard rebuild remain open. Existing findings are not approval decisions.
+The repository's main-branch foundation generates synthetic transactions, screens statistical/heuristic signals and serves a basic overview/findings/transactions dashboard. The rebuild branch now adds an initial deterministic policy evaluator, a synthetic versioned policy, persisted decision APIs and an expense-decision workbench. The initial decision-engine slice is CI-verified. The latest micro-detail dashboard and claim-intake pass is now CI-verified: 48 tests passed, alongside the synthetic pipeline, multi-seed validation, Python compilation and JavaScript syntax checks. Browser-level verification remains pending. **This is a first vertical slice, not a complete product:** claim/evidence domain modelling, policy management, authorised overrides, end-to-end lifecycle and the full state-driven dashboard rebuild remain open. Existing findings are not approval decisions.
 
 The product scope, code audit, target decision contract, dashboard acceptance criteria and phased rebuild are documented in [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md). The former 73% showcase score has been withdrawn because it measured repository completeness rather than the intended product outcome. Current evidence-based product completion baseline: **24/100**.
 
@@ -105,3 +105,6 @@ This is a portfolio prototype, not a production-certified financial control plat
 
 
 The rebuild branch now has improved faceted chart queries, a more complete claim-intake form, explicit receipt/duplicate-data limitations, decision outcome explanations, transaction detail drill-through and currency precision. These latest changes remain subject to CI and browser acceptance; see the rebuild plan for exact acceptance criteria.
+
+
+Latest rebuild CI: 48 tests passed in run #105. This verifies automated tests and syntax, not real browser interactions or receipt/OCR automation. The product remains a synthetic prototype; see PRODUCT_SCOPE_AND_REBUILD_PLAN.md for the 53/100 assessment and remaining acceptance gates.
