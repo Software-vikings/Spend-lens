@@ -172,7 +172,7 @@
       $("decision-result").innerHTML='<div class="empty">Evaluation saved. Loading rule-level explanation…</div>';
       const list=await api("/v1/decisions?limit=100");state.decisions=list.items||[];renderDecisions();$("decision-count").textContent=number(list.total||0);
       await showDecision(result.decision_id);toast("Expense evaluated and decision saved.");
-    }catch(err){toast(err.message);}
+    }catch(err){toast(err.message==="Insufficient role"?"Expense evaluation requires an analyst API key. Reconnect with analyst access.":err.message);}
   });
   $("connect-btn").addEventListener("click",connect);$("api-key").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
   $("refresh-btn").addEventListener("click",refreshAll);$("findings-refresh").addEventListener("click",refreshAll);$("transactions-refresh").addEventListener("click",()=>loadTransactions());
