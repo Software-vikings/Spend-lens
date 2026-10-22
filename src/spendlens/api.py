@@ -344,9 +344,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         db()
         try:
             result = assign_claim(db_path, claim_id, body.assignee, body.assigned_by,
-                                  body.priority, body.sla_hours, body.note)
-            record_audit_event(db_path,"CLAIM_ASSIGNED","claim",claim_id,actor,
-                {"assignee":body.assignee,"priority":body.priority,"sla_hours":body.sla_hours})
+                                  body.priority, body.sla_hours, body.note, audit_actor=actor)
             return result
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
@@ -359,10 +357,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         db()
         try:
             result=resolve_claim(db_path,claim_id,body.action,body.reviewer,
-                                 body.reason,body.evidence_note)
-            record_audit_event(db_path,"CLAIM_RESOLVED","claim",claim_id,actor,
-                {"action":body.action,"resolution_status":result["resolution_status"],
-                 "reviewer":body.reviewer,"reason":body.reason})
+                                 body.reason,body.evidence_note,audit_actor=actor)
             return result
         except LookupError as exc:
             raise HTTPException(404,str(exc)) from exc
