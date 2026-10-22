@@ -82,3 +82,13 @@ def test_malformed_currency_is_insufficient_data():
     result = evaluate_expense(expense(currency="EURO"), POLICY)
     assert result["outcome"] == "INSUFFICIENT_DATA"
     assert any(rule["rule_id"] == "INPUT-003" for rule in result["evaluated_rules"])
+
+
+def test_missing_claim_identity_context_is_insufficient_data():
+    incomplete = expense(merchant_name="", employee_id="", department="")
+    result = evaluate_expense(incomplete, POLICY)
+    assert result["outcome"] == "INSUFFICIENT_DATA"
+    required = next(rule for rule in result["evaluated_rules"] if rule["rule_id"] == "INPUT-001")
+    assert "merchant_name" in required["evidence"]["missing_fields"]
+    assert "employee_id" in required["evidence"]["missing_fields"]
+    assert "department" in required["evidence"]["missing_fields"]
