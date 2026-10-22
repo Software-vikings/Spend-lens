@@ -1,20 +1,26 @@
 # SpendLens
 
-**An explainable business-spending intelligence prototype.**
+**An early-stage automated expense-decision prototype under rebuild.**
 
-SpendLens analyses synthetic company expense transactions to surface unusual patterns and potential cost inefficiencies for human review. It is an independent portfolio project and is not connected to Pleo, a bank or any real financial institution.
+SpendLens is being rebuilt to evaluate synthetic expense claims against explicit, configurable company policy and return explainable approval, rejection, review or insufficient-evidence outcomes. The current codebase is a foundation—not yet that complete decision system. It is an independent portfolio project and is not connected to Pleo, a bank or any real financial institution.
 
 > **Demo data only:** all transactions are synthetic and denominated in EUR. Findings are screening signals, not fraud verdicts, policy determinations or proof of savings.
 
-## What it does
+## Current implementation status
+
+The repository currently generates synthetic transactions, screens statistical/heuristic signals, stores generic findings and serves a basic overview/findings/transactions dashboard. **It does not yet automatically determine whether an expense should be approved or rejected against a company policy.** There is no first-class expense-claim/evidence model or versioned policy engine. The current findings are not approval decisions.
+
+The product scope, code audit, target decision contract, dashboard acceptance criteria and phased rebuild are documented in [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md). The former 73% showcase score has been withdrawn because it measured repository completeness rather than the intended product outcome. Current evidence-based product completion baseline: **24/100**.
+
+## Existing foundation (not the finished product)
 
 - Generates reproducible synthetic company expense records and stores them in SQLite.
-- Screens unusually high transactions against merchant/category peers using median absolute deviation (MAD).
+- Screens unusually high transactions against merchant/category peers using median absolute deviation (MAD); this is a risk signal, not a policy decision.
 - Identifies recurring-payment changes, merchant amount drift, duplicate candidates and fragmented-purchase patterns.
 - Analyses monthly department spend and spend per employee using explicit headcount inputs.
 - Exposes authenticated FastAPI endpoints for summary, analytics, transactions, findings and analyst review.
-- Provides a browser dashboard with spend overview, findings queue, transaction explorer and review history.
-- Supports interactive month, department and category cross-filtering: selecting a chart value updates matching spend metrics, other transaction charts and the ledger; the transaction KPI opens the filtered ledger and transaction rows show detail.
+- Provides a basic browser dashboard with spend overview, findings queue, transaction explorer and review history.
+- Includes an initial month/department/category cross-filter implementation; browser-level behaviour is not yet verified and the UI is scheduled for a state-driven rebuild.
 - Produces SQL analytics, Power BI-ready CSV exports and a multi-seed validation report.
 
 ## Architecture
@@ -82,11 +88,9 @@ Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions checks out the repos
 
 The pipeline generates Power BI-ready CSV exports under `reports/`. See [Power BI build guide](powerbi/POWER_BI_BUILD_GUIDE.md) for the recommended semantic model, DAX measures and report pages. A native `.pbix` file is not included.
 
-## Employer showcase readiness
+## Product completion status
 
-**Current weighted estimate: 73%.** The complete application source, dashboard, tests, SQL, CI configuration, Docker configuration and project documentation are now present in this GitHub repository. Hosted CI has passed on the source commit. Remaining showcase work is tracked in [the execution tracker](EMPLOYER_SHOWCASE_READINESS.md#execution-tracker--22-october-2026): manual fresh-clone/API/dashboard verification, genuine screenshots, setup-instruction verification, Docker runtime, historical-only validation, Power BI and security checks.
-
-See [EMPLOYER_SHOWCASE_READINESS.md](EMPLOYER_SHOWCASE_READINESS.md) for the scoring rubric, evidence and acceptance criteria.
+**Baseline: 24/100 against the intended automated expense-decision product.** The policy model, first-class claim/evidence model and deterministic decision engine are not implemented. Existing charts and anomaly screens do not meet the product objective. See [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md) for the weighted rubric and phased exit criteria. This score is not production readiness.
 
 ## Evaluation limitations
 
