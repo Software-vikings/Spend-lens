@@ -22,7 +22,7 @@
         <div class="metrics">
           <article class="metric"><div class="metric-top"><span>Total spend</span><span class="metric-icon">€</span></div><strong id="total-spend">—</strong><small>Across recorded transactions</small></article>
           <article class="metric clickable-metric" id="transaction-count-card" role="button" tabindex="0" aria-label="Open filtered transactions"><div class="metric-top"><span>Transactions <small class="metric-hint">Open ledger ↗</small></span><span class="metric-icon">↗</span></div><strong id="transaction-count">—</strong><small>Click to inspect matching records</small></article>
-          <article class="metric"><div class="metric-top"><span>Open findings</span><span class="metric-icon amber">◎</span></div><strong id="open-findings">—</strong><small>Awaiting analyst action</small></article>
+          <article class="metric"><div class="metric-top"><span>Open findings <small class="metric-hint">Workspace-wide</small></span><span class="metric-icon amber">◎</span></div><strong id="open-findings">—</strong><small>Awaiting analyst action</small></article>
           <article class="metric"><div class="metric-top"><span>Finding types</span><span class="metric-icon">⌘</span></div><strong id="finding-types">—</strong><small>Distinct signal categories</small></article>
         </div>
         <div class="grid-main">
@@ -60,8 +60,8 @@
               <label>Receipt status<select name="receipt_status"><option value="provided">Receipt supplied</option><option value="missing">No receipt supplied</option><option value="unreadable">Receipt supplied but unreadable</option></select></label>
               <label>Receipt reference<input name="receipt_id" placeholder="Reference / attachment ID"></label>
               <label>Receipt total<input name="receipt_total" type="number" min="0" step="0.01" placeholder="Enter total printed on receipt"></label>
-              <label class="check-field"><input name="duplicate_suspected" type="checkbox"> Possible duplicate flagged by system</label>
-              <p class="field-note wide">Receipt images are not uploaded or OCR-verified in this prototype. Receipt status and total are user-entered evidence metadata.</p>
+              <label class="check-field"><input name="duplicate_suspected" type="checkbox"> Include duplicate-risk signal (demo)</label>
+              <p class="field-note wide">Receipt images are not uploaded or OCR-verified in this prototype. Receipt status and total are user-entered evidence metadata. The duplicate-risk checkbox is a simulated input, not an automatic duplicate detector.</p>
               <button class="primary-btn wide" type="submit" id="evaluate-expense-btn">Run policy checks and record decision →</button>
             </form>
             <p class="decision-disclaimer">This is a synthetic example policy, not your employer's policy. A decision is only as reliable as the policy and evidence supplied.</p>
