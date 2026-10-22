@@ -199,6 +199,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
 
     @app.post("/v1/expenses/evaluate")
     def evaluate_expense_route(body: ExpenseEvaluationRequest,
+                               idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
                                _:str=Depends(require_role("analyst"))):
         if not db_path.exists():
             raise HTTPException(503, "SpendLens database not found. Run the pipeline first.")
@@ -215,9 +216,10 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
                 expense["duplicate_suspected"] = True
                 expense["duplicate_match"] = duplicate_match
             evaluation = evaluate_expense(expense, policy)
-            return save_decision(db_path, expense, evaluation)
+            return save_decision(db_path, expense, evaluation, idempotency_key)
         except ValueError as exc:
-            raise HTTPException(422, str(exc)) from exc
+            status = 409 if "Idempotency key" in str(exc) else 422
+            raise HTTPException(status, str(exc)) from exc
 
     @app.get("/v1/decisions")
     def decisions(outcome:Literal["APPROVE","REJECT","REVIEW","INSUFFICIENT_DATA"]|None=None,
