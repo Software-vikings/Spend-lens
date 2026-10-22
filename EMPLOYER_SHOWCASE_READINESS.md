@@ -15,7 +15,7 @@ The score estimates how much work is complete toward making SpendLens independen
 | Core product functionality | 20 | 18 | Data pipeline, SQLite, spend screens, authenticated API, review workflow and browser dashboard are present in GitHub. Manual browser walkthrough from a fresh clone remains. |
 | Analytical validity | 15 | 9 | Multi-seed synthetic evaluation, threshold sensitivity, ablation and limitations report exist. Historical-only temporal validation and independent benchmark data remain. |
 | Reproducible setup | 15 | 11 | README setup, dependencies and package metadata are present. Hosted clean checkout installed dependencies and ran pipeline, validation and tests. Manual API/browser startup from a fresh clone remains. |
-| Tests and CI | 15 | 13 | Five test modules are in GitHub; 30 tests passed locally. Hosted GitHub Actions run for source commit 218ebf8 passed checkout, dependency install, pytest, pipeline, validation and compilation. |
+| Tests and CI | 15 | 13 | Five test modules are in GitHub; 30 tests passed locally. Hosted GitHub Actions run for latest main commit 95e3bb8 passed checkout, dependency install, pytest, pipeline, validation and compilation. |
 | UX and demo evidence | 10 | 6 | Dashboard HTML/CSS/JS and interactions are in GitHub; API tests verify dashboard and asset routes. Genuine screenshots, walkthrough and hosted demo remain. |
 | SQL and Power BI | 10 | 7 | SQL schema/analytics and Power BI build guide are in GitHub. Pipeline-generated exports are reproducible; no native PBIX or report screenshots are included. |
 | Deployment and operations | 5 | 1 | Dockerfile, Compose and entrypoint are in GitHub. Docker build/runtime and public deployment are unverified. |
@@ -45,7 +45,7 @@ Runtime SQLite database, local caches, credentials and generated transaction/exp
 - Dashboard JavaScript syntax check passed.
 - GitHub Actions source commit **218ebf8** completed successfully. Steps verified: checkout, Python setup, dependency installation, pytest, synthetic pipeline, multi-seed validation and Python compilation.
 - GitHub tree inspection confirmed the 34 tracked paths listed above.
-- Subsequent commits update README and readiness documentation; the successful source commit includes the complete app modules, dashboard, tests, CI, SQL, Docker configuration and Power BI guide.
+- The latest main commit includes the complete app modules, dashboard, tests, CI, SQL, Docker configuration, Power BI guide and updated documentation.
 
 The successful hosted workflow verifies a clean GitHub checkout can install and execute the automated checks. It does not replace a manual browser walkthrough or Docker runtime test.
 
