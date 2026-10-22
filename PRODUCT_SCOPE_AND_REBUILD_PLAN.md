@@ -118,12 +118,38 @@ A synthetic expense can be submitted, automatically evaluated against a versione
 | Phase | Status | Evidence / remaining gate |
 |---|---|---|
 | Phase 0 — Baseline and documentation | Complete on rebuild branch | Product audit, target outcomes, acceptance criteria, architecture, scoring rubric, README correction and private-log ignore rule committed. |
-| Phase 1 — Claim/evidence domain and synthetic policy | In progress | Versioned synthetic example policy exists. A first evaluation input contract is implemented, but a persisted first-class claim/evidence domain model and expanded synthetic claim fixtures remain. |
-| Phase 2 — Decision engine | First vertical slice implemented; verification pending | Deterministic evaluator, four outcomes, rule explanations, SQLite decision persistence and authenticated API routes added. Draft PR #3. GitHub Actions has not yet supplied a verified green result; do not count this as a completed phase. |
+| Phase 1 — Claim/evidence domain and synthetic policy | Partial | Versioned synthetic example policy and expense input payload exist. Persisted claim/evidence entities, evidence lifecycle and broader fixture set remain. |
+| Phase 2 — Decision engine | Initial engine/API slice CI-verified; phase exit gate still open | Deterministic four-outcome evaluator, rule explanations, SQLite decision persistence and authenticated evaluate/list/detail routes. GitHub Actions run #65 passed all 44 tests, synthetic pipeline, multi-seed validation, Python compilation and JS syntax. Full policy coverage, audit lifecycle, re-evaluation and override tests remain. |
 | Phase 3 — API/workflow | Partial | Evaluate/list/detail endpoints exist. Submission lifecycle, policy management, overrides, re-evaluation and complete audit lifecycle remain. |
 | Phase 4 — Dashboard rebuild | Initial decision workbench added; full rebuild remains | Added a decision page, expense evaluation form, persisted decision queue and rule-level result display. Existing monolithic UI/state model remains; shared-state architecture and browser-level cross-filter/drill-through are still required. |
-| Phase 5 — Validation/release | Not started | Automated workflow and browser walkthrough must pass; no new green CI or manual browser evidence is claimed. |
+| Phase 5 — Validation/release | Automated CI slice passed; release validation not started | GitHub Actions run #65 is green. Clean-clone/browser walkthrough, browser interaction tests, security/dependency checks and deployment verification remain. |
 
-**Current measured score:** retain the 24/100 baseline until the new evaluator/API tests pass in hosted CI and the rubric can award evidence-based credit. The 24/100 figure is the pre-implementation baseline, not a claim that this branch's unverified work has been accepted.
+**Current evidence-based product score: 49/100 (22 October 2026).** The 24/100 figure below is retained as the pre-implementation baseline. The score is provisional and reflects passing CI for the initial evaluator/API/workbench slice; it does not imply full phase completion, browser verification or production readiness. The updated workstream breakdown is recorded below.
 
 **Current draft implementation:** [PR #3 — Rebuild SpendLens around policy-based expense decisions](https://github.com/Software-vikings/Spend-lens/pull/3). The branch is not merged into the default branch. The frontend/dashboard rebuild is not included in this first vertical slice.
+
+
+## Re-scored progress after CI verification — 22 October 2026
+
+| Workstream | Weight | Awarded | Evidence / remaining gap |
+|---|---:|---:|---|
+| Expense and evidence domain model | 10 | 1 | Expense payload contract exists; no first-class persisted claim/evidence entities or lifecycle. |
+| Configurable policy model/versioning | 15 | 7 | Versioned JSON policy and basic validation; no policy administration, approval workflow or full rule-family coverage. |
+| Deterministic decision engine/explanations | 25 | 17 | Four outcomes, deterministic evaluation, rule evidence and tests pass; coverage remains limited to the implemented rule set. |
+| Persistence, audit and exception/override lifecycle | 10 | 3 | Evaluation snapshots persist and can be listed/read; no event-sourced audit trail, authorised override or re-evaluation lifecycle. |
+| API/workflow integration | 10 | 5 | Authenticated evaluate/list/detail endpoints pass; no full claim submission workflow or common decision/claim filter semantics. |
+| Connected dashboard/drill-through | 15 | 4 | Decision workbench and decision queue added; frontend remains monolithic and cross-view selection/filter propagation is incomplete. |
+| Tests, validation and reproducibility | 10 | 7 | CI run #65: 44 tests passed; pipeline, validation, compile and JS syntax passed. Browser, Docker and security checks remain. |
+| Product documentation/safe demo packaging | 5 | 5 | Product reset, limitations, synthetic-policy warning and private-log ignore rule documented. |
+| **Total** | **100** | **49** | **Provisional implementation score, not production readiness.** |
+
+### Verified CI evidence
+
+- Workflow: SpendLens CI, run #65
+- Run ID: 39757279432
+- Result: success
+- Pytest: 44 passed, 1 deprecation warning, 1.51 seconds
+- Additional successful steps: synthetic pipeline, multi-seed validation, Python compileall and dashboard JavaScript syntax check.
+- Run URL: https://github.com/Software-vikings/Spend-lens/actions/runs/39757279432
+
+The phase 2 engine/API slice is now CI-verified, but Phase 2 is not fully complete because override, re-evaluation and audit lifecycle acceptance tests are not present. The dashboard is not browser-verified. The PR remains a draft and has not been merged.
