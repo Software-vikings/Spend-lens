@@ -65,7 +65,8 @@ def find_potential_duplicate(db_path: str | Path, expense: dict) -> dict | None:
     return None
 
 
-def save_decision(db_path: str | Path, expense: dict, evaluation: dict,\n                  idempotency_key: str | None = None) -> dict:
+def save_decision(db_path: str | Path, expense: dict, evaluation: dict,
+                  idempotency_key: str | None = None) -> dict:
     request_hash = hashlib.sha256(json.dumps({"expense": expense, "evaluation": evaluation}, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
     if idempotency_key:
         with connect(db_path) as conn:
