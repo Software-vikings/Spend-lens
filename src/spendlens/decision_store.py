@@ -254,10 +254,16 @@ def get_claim(db_path: str | Path, claim_id: str) -> dict | None:
             "SELECT evidence_id,decision_id,evidence_type,evidence_ref,evidence_status,source,metadata,created_at FROM claim_evidence WHERE claim_id=? ORDER BY created_at DESC",
             (claim_id,)
         ).fetchall()
+        resolutions = conn.execute(
+            "SELECT resolution_id,action,previous_status,new_status,reviewer,reason,evidence_note,created_at FROM claim_resolution_events WHERE claim_id=? ORDER BY created_at,rowid",
+            (claim_id,)
+        ).fetchall()
     item = dict(claim)
     item["current_payload"] = json.loads(item["current_payload"])
     item["submissions"] = [{**dict(row), "payload": json.loads(row["payload"])} for row in submissions]
     item["evidence"] = [{**dict(row), "metadata": json.loads(row["metadata"])} for row in evidence]
+    item["resolution_history"] = [dict(row) for row in resolutions]
+    item["resolution_status"] = resolutions[-1]["new_status"] if resolutions else None
     return item
 
 def resolve_claim(db_path: str | Path, claim_id: str, action: str,
