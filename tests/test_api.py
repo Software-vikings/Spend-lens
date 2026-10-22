@@ -228,3 +228,25 @@ def test_idempotency_key_cannot_be_reused_for_different_expense(tmp_path):
     changed=dict(base,amount="41.00")
     conflict=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":changed})
     assert conflict.status_code == 409
+
+
+def test_transaction_detail_returns_only_exactly_linked_findings(tmp_path):
+    import sqlite3
+    db,_=prepared_db(tmp_path)
+    with sqlite3.connect(db) as conn:
+        transaction_id=conn.execute(
+            "SELECT transaction_id FROM transactions ORDER BY transaction_id LIMIT 1"
+        ).fetchone()[0]
+    persist_findings(db, {"anomaly":[
+        {"transaction_id":transaction_id,"amount":250.0,"currency":"EUR","merchant_name":"Linked merchant"}
+    ]}, "run-linked")
+    client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":VIEWER}
+    assert client.get(f"/v1/transactions/{transaction_id}").status_code == 401
+    response=client.get(f"/v1/transactions/{transaction_id}",headers=headers)
+    assert response.status_code == 200
+    payload=response.json()
+    assert payload["transaction"]["transaction_id"] == transaction_id
+    assert len(payload["related_findings"]) == 1
+    assert payload["related_findings"][0]["finding_type"] == "anomaly"
+    assert client.get("/v1/transactions/DOES-NOT-EXIST",headers=headers).status_code == 404
