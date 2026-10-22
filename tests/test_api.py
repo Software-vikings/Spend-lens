@@ -533,3 +533,24 @@ def test_upload_endpoint_rejects_unsupported_extension(tmp_path):
       files={"file":("company-export.xls",b"some bytes","application/vnd.ms-excel")})
     assert response.status_code==422
     assert "CSV or XLSX" in response.json()["detail"]
+
+
+
+def test_upload_endpoint_accepts_xlsx_workbooks(tmp_path):
+    from datetime import date
+    from io import BytesIO
+    from openpyxl import Workbook
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    workbook=Workbook()
+    sheet=workbook.active
+    sheet.append(["Date","Merchant","Amount","Currency","Employee"])
+    sheet.append([date(2026,10,1),"Rail Services",72.50,"INR","EMP-100"])
+    sheet.append([date(2026,10,2),"City Cafe",28.00,"INR","EMP-101"])
+    stream=BytesIO();workbook.save(stream);workbook.close()
+    response=client.post("/v1/imports/analyze",
+      files={"file":("expenses.xlsx",stream.getvalue(),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert response.status_code==200
+    payload=response.json()
+    assert payload["summary"]["rows_analysed"]==2
+    assert payload["items"][0]["transaction_date"]=="2026-10-01"
+    assert payload["items"][0]["merchant_name"]=="Rail Services"
