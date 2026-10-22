@@ -55,7 +55,18 @@
       await loadFilterOptions();
       const qs=filterQuery();
       const suffix=qs?`?${qs}`:"";
-      const [summary,overview,findings,decisions]=await Promise.all([api("/v1/summary"+suffix),api("/v1/analytics/overview"+suffix),api("/v1/findings?limit=100"),api("/v1/decisions?limit=100")]);
+      // Each chart keeps its own dimension available for selection. The other
+      // active filters still apply, but a selected month must not erase other months.
+      const trendQuery=new URLSearchParams(Object.entries(state.filters).filter(([k,v])=>k!=="month"&&v));
+      const departmentQuery=new URLSearchParams(Object.entries(state.filters).filter(([k,v])=>k!=="department"&&v));
+      const categoryQuery=new URLSearchParams(Object.entries(state.filters).filter(([k,v])=>k!=="category"&&v));
+      const [summary,overview,trendData,departmentData,categoryData,findings,decisions]=await Promise.all([
+        api("/v1/summary"+suffix),api("/v1/analytics/overview"+suffix),
+        api("/v1/analytics/overview"+(trendQuery.toString()?"?"+trendQuery:"")),
+        api("/v1/analytics/overview"+(departmentQuery.toString()?"?"+departmentQuery:"")),
+        api("/v1/analytics/overview"+(categoryQuery.toString()?"?"+categoryQuery:"")),
+        api("/v1/findings?limit=100"),api("/v1/decisions?limit=100")
+      ]);
       state.overview=overview;state.findings=findings.items||[];state.decisions=decisions.items||[];
       $("decision-count").textContent=number(decisions.total||0);renderDecisions();
       $("total-spend").textContent=money(summary.total_spend);
@@ -64,7 +75,7 @@
       $("open-findings").textContent=number(open);
       $("finding-types").textContent=number(Object.keys(summary.findings_by_type||{}).length);
       $("nav-count").textContent=number(state.findings.length);
-      renderTrend(overview.monthly||[]);renderDepartments(overview.departments||[]);renderCategories(overview.categories||[]);renderLatest();
+      renderTrend(trendData.monthly||[]);renderDepartments(departmentData.departments||[]);renderCategories(categoryData.categories||[]);renderLatest();
       renderFindings();renderFilterState();await loadTransactions();
     } catch(e){toast(e.message);if(/key|auth|credential/i.test(e.message)){ $("connect-overlay").classList.remove("hidden");$("connection-label").textContent="Disconnected";$("connection-dot").classList.add("red");}}
   };
@@ -110,7 +121,13 @@
     try {
       const d=await api(`/v1/decisions/${encodeURIComponent(id)}`);
       const rules=d.evaluation.evaluated_rules||[];
-      $("decision-result").innerHTML=`<div class="decision-outcome large ${esc(d.outcome.toLowerCase())}">${esc(d.outcome.replaceAll("_"," "))}</div><h3>${esc(d.expense_id)}</h3><p>${esc(d.evaluation.decision_explanation)}</p><div class="finding-meta">Policy ${esc(d.policy_id)} v${esc(d.policy_version)} · Engine v${esc(d.engine_version)}</div><div class="rule-results">${rules.map(r=>`<div class="rule-result"><div><b>${esc(r.label)}</b><span class="rule-status ${esc(r.status.toLowerCase())}">${esc(r.status)}</span></div><p>${esc(r.explanation)}</p><small>${esc(r.rule_id)} · ${esc(JSON.stringify(r.evidence||{}))}</small></div>`).join("")}</div>`;
+      const explanations={
+        APPROVE:"Every applicable mandatory check passed under this policy version. This is a policy result, not proof that the underlying receipt is genuine.",
+        REJECT:"At least one explicit hard-stop rule in the configured policy was violated. The failed rule is shown below.",
+        REVIEW:"The claim has an exception or risk signal that the configured policy does not allow the system to resolve automatically.",
+        INSUFFICIENT_DATA:"Required information or evidence is missing or invalid. The system cannot safely approve this claim."
+      };
+      $("decision-result").innerHTML=`<div class="decision-outcome large ${esc(d.outcome.toLowerCase())}">${esc(d.outcome.replaceAll("_"," "))}</div><h3>${esc(d.expense_id)}</h3><p class="decision-summary">${esc(explanations[d.outcome]||"Decision recorded.")}</p><div class="finding-meta">Policy ${esc(d.policy_id)} v${esc(d.policy_version)} · Engine v${esc(d.engine_version)} · ${esc(new Date(d.created_at).toLocaleString())}</div><div class="rule-results"><h4>Why the system reached this outcome</h4>${rules.map(r=>`<div class="rule-result"><div><b>${esc(r.label)}</b><span class="rule-status ${esc(r.status.toLowerCase())}">${esc(r.status.replaceAll("_"," "))}</span></div><p>${esc(r.explanation)}</p><small>${esc(r.rule_id)} · ${esc(JSON.stringify(r.evidence||{}))}</small></div>`).join("")}</div>`;
     } catch(e){toast(e.message);}
   };
   const renderTransactions = () => {
@@ -166,15 +183,18 @@
     const form=new FormData(e.currentTarget);
     const amount=Number(form.get("amount"));
     const receiptProvided=form.get("receipt_provided")==="on";
-    const expense={expense_id:String(form.get("expense_id")).trim(),amount:amount,currency:"EUR",category:form.get("category"),transaction_date:form.get("transaction_date"),business_purpose:String(form.get("business_purpose")).trim(),receipt:receiptProvided?{provided:true,readable:true,total:String(form.get("receipt_total")||"")}:{provided:false},duplicate_suspected:false};
+    const receiptStatus=String(form.get("receipt_status"));
+    const receipt={provided:receiptStatus!=="missing",readable:receiptStatus==="provided",receipt_id:String(form.get("receipt_id")||"").trim()||null,total:String(form.get("receipt_total")||"").trim()||null};
+    const expense={expense_id:String(form.get("expense_id")).trim(),employee_id:String(form.get("employee_id")).trim(),merchant_name:String(form.get("merchant_name")).trim(),department:String(form.get("department")).trim(),amount:amount,currency:form.get("currency"),category:form.get("category"),transaction_date:form.get("transaction_date"),business_purpose:String(form.get("business_purpose")).trim(),receipt,duplicate_suspected:form.get("duplicate_suspected")==="on"};
     try{
       const result=await api("/v1/expenses/evaluate",{method:"POST",body:JSON.stringify({expense})});
-      $("decision-result").innerHTML='<div class="empty">Evaluation saved. Loading rule-level explanation…</div>';
+      $("decision-result").innerHTML='<div class="empty">Decision recorded. Loading rule-level explanation…</div>';
       const list=await api("/v1/decisions?limit=100");state.decisions=list.items||[];renderDecisions();$("decision-count").textContent=number(list.total||0);
       await showDecision(result.decision_id);toast("Expense evaluated and decision saved.");
     }catch(err){toast(err.message==="Insufficient role"?"Expense evaluation requires an analyst API key. Reconnect with analyst access.":err.message);}
   });
-  $("connect-btn").addEventListener("click",connect);$("api-key").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
+  $("connect-btn").addEventListener("click",connect);
+  $("expense-evaluation-form").addEventListener("input",e=>{if(e.target.matches("input,select,textarea"))e.target.classList.remove("field-invalid");});$("api-key").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
   $("refresh-btn").addEventListener("click",refreshAll);$("findings-refresh").addEventListener("click",refreshAll);$("transactions-refresh").addEventListener("click",()=>loadTransactions());
   $("finding-search").addEventListener("input",renderFindings);$("finding-status").addEventListener("change",renderFindings);
   let searchTimer=null;
