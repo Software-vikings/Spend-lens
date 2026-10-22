@@ -208,3 +208,23 @@ def test_backend_flags_matching_prior_expense_for_review(tmp_path):
     risk_rule=next(rule for rule in saved["evaluation"]["evaluated_rules"] if rule["rule_id"]=="RISK-001")
     assert risk_rule["status"] == "REVIEW"
     assert risk_rule["evidence"]["match"]["prior_expense_id"] == "EXP-DUP-001"
+
+
+def test_expense_evaluation_idempotency_returns_same_decision(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":ANALYST,"Idempotency-Key":"expense-submit-000000000001"}
+    expense={"expense_id":"EXP-IDEM-001","employee_id":"EMP-88","merchant_name":"Office Depot","department":"Operations","amount":"40.00","currency":"EUR","category":"Office Supplies","transaction_date":"2026-05-15","business_purpose":"Printer paper","receipt":{"provided":True,"readable":True,"receipt_id":"R-IDEM-001","total":"40.00"}}
+    first=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":expense})
+    second=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":expense})
+    assert first.status_code == second.status_code == 200
+    assert first.json()["decision_id"] == second.json()["decision_id"]
+    assert client.get("/v1/decisions",headers={"X-API-Key":VIEWER}).json()["total"] == 1
+
+def test_idempotency_key_cannot_be_reused_for_different_expense(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":ANALYST,"Idempotency-Key":"expense-submit-000000000002"}
+    base={"expense_id":"EXP-IDEM-002","employee_id":"EMP-89","merchant_name":"Office Depot","department":"Operations","amount":"40.00","currency":"EUR","category":"Office Supplies","transaction_date":"2026-05-15","business_purpose":"Printer paper","receipt":{"provided":True,"readable":True,"receipt_id":"R-IDEM-002","total":"40.00"}}
+    assert client.post("/v1/expenses/evaluate",headers=headers,json={"expense":base}).status_code == 200
+    changed=dict(base,amount="41.00")
+    conflict=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":changed})
+    assert conflict.status_code == 409
