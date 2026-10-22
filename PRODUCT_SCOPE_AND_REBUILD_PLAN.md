@@ -124,7 +124,7 @@ A synthetic expense can be submitted, automatically evaluated against a versione
 | Phase 4 — Dashboard rebuild | Initial decision workbench added; full rebuild remains | Added a decision page, expense evaluation form, persisted decision queue and rule-level result display. Existing monolithic UI/state model remains; shared-state architecture and browser-level cross-filter/drill-through are still required. |
 | Phase 5 — Validation/release | Automated CI slice passed; release validation not started | GitHub Actions run #65 is green. Clean-clone/browser walkthrough, browser interaction tests, security/dependency checks and deployment verification remain. |
 
-**Current evidence-based product score: 49/100 (22 October 2026).** The 24/100 figure below is retained as the pre-implementation baseline. The score is provisional and reflects passing CI for the initial evaluator/API/workbench slice; it does not imply full phase completion, browser verification or production readiness. The updated workstream breakdown is recorded below.
+**Current evidence-based product score: 53/100 (22 October 2026).** The 24/100 figure below is retained as the pre-implementation baseline. The score is provisional and reflects passing CI for the initial evaluator/API/workbench slice; it does not imply full phase completion, browser verification or production readiness. The updated workstream breakdown is recorded below.
 
 **Current draft implementation:** [PR #3 — Rebuild SpendLens around policy-based expense decisions](https://github.com/Software-vikings/Spend-lens/pull/3). The branch is not merged into the default branch. The frontend/dashboard rebuild is not included in this first vertical slice.
 
@@ -135,13 +135,13 @@ A synthetic expense can be submitted, automatically evaluated against a versione
 |---|---:|---:|---|
 | Expense and evidence domain model | 10 | 1 | Expense payload contract exists; no first-class persisted claim/evidence entities or lifecycle. |
 | Configurable policy model/versioning | 15 | 7 | Versioned JSON policy and basic validation; no policy administration, approval workflow or full rule-family coverage. |
-| Deterministic decision engine/explanations | 25 | 17 | Four outcomes, deterministic evaluation, rule evidence and tests pass; coverage remains limited to the implemented rule set. |
+| Deterministic decision engine/explanations | 25 | 18 | Four outcomes, rule evidence, zero/future-date/currency and claim-identity checks pass; policy rule coverage remains limited. |
 | Persistence, audit and exception/override lifecycle | 10 | 3 | Evaluation snapshots persist and can be listed/read; no event-sourced audit trail, authorised override or re-evaluation lifecycle. |
 | API/workflow integration | 10 | 5 | Authenticated evaluate/list/detail endpoints pass; no full claim submission workflow or common decision/claim filter semantics. |
-| Connected dashboard/drill-through | 15 | 4 | Decision workbench and decision queue added; frontend remains monolithic and cross-view selection/filter propagation is incomplete. |
-| Tests, validation and reproducibility | 10 | 7 | CI run #65: 44 tests passed; pipeline, validation, compile and JS syntax passed. Browser, Docker and security checks remain. |
+| Connected dashboard/drill-through | 15 | 6 | Faceted month/department/category charts, explicit selection states, transaction detail drawer and decision workbench added; frontend remains monolithic and browser-tested end-to-end flow is outstanding. |
+| Tests, validation and reproducibility | 10 | 8 | Latest CI run #105: 48 tests passed; pipeline, multi-seed validation, compile and JS syntax passed. Browser, Docker and security checks remain. |
 | Product documentation/safe demo packaging | 5 | 5 | Product reset, limitations, synthetic-policy warning and private-log ignore rule documented. |
-| **Total** | **100** | **49** | **Provisional implementation score, not production readiness.** |
+| **Total** | **100** | **53** | **Provisional implementation score, not production readiness.** |
 
 ### Verified CI evidence
 
@@ -177,3 +177,23 @@ The following code changes have been made on the rebuild branch; hosted CI and b
 - Inspect at desktop and mobile widths for clipped labels, inaccessible controls and layout overflow.
 
 **Score treatment:** retain 49/100 until the new changes pass hosted CI and the dashboard acceptance checks. Do not award visual or interaction credit based on source edits alone.
+
+
+## Latest micro-detail implementation verification — 22 October 2026
+
+- Latest PR head: `10a812369815aa2e38ac775994fcd6b275284c9e`
+- GitHub Actions SpendLens CI run #105 (ID `39770075769`) passed.
+- Pytest: **48 passed**, 1 warning, 1.54 seconds.
+- Synthetic pipeline, multi-seed validation, Python compileall and JavaScript syntax check all passed.
+- Run: https://github.com/Software-vikings/Spend-lens/actions/runs/39770075769
+
+The score is now **53/100**. Four additional points are awarded only for implemented and CI-verified engine edge checks, faceted chart query behaviour in the code, transaction detail drill-through and improved UI logic. This is not browser acceptance: no screenshot/manual browser evidence or Playwright run has been completed.
+
+### Remaining precise UI/product defects and acceptance gates
+1. Replace the monolithic frontend script with modular state and route management; current shared filter state remains imperative.
+2. Add automated browser tests for chart selection, filter retention, table reconciliation, transaction drawer, decision result and navigation.
+3. Persist first-class claim/evidence records rather than only storing an expense JSON snapshot in decision history.
+4. Implement actual receipt file upload, storage metadata and OCR/extraction validation before describing evidence as machine-checked.
+5. Implement duplicate detection from claim/transaction records; current duplicate checkbox is explicitly a simulated input.
+6. Add policy administration, policy-effective dates, employee/department-specific limits and authorised override/re-evaluation/audit lifecycle.
+7. Add claim/decision list filters and detail-to-overview navigation with shared state.
