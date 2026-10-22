@@ -84,7 +84,7 @@ def parse_api_keys(raw: str | None = None) -> dict[str,str]:
 
 def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = None,
                rate_limit: int = 600, rate_window_seconds: int = 60,
-               upload_rate_limit: int = 8, write_rate_limit: int = 60) -> FastAPI:
+               upload_rate_limit: int = 10, write_rate_limit: int = 60) -> FastAPI:
     db_path=Path(db_path)
     configured=parse_api_keys() if api_keys is None else dict(api_keys)
     app=FastAPI(title="SpendLens API",version="1.0.0",
@@ -191,10 +191,13 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         return {"status":"ok","service":"spendlens-api"}
 
     @app.post("/v1/imports/analyze")
-    async def analyse_expense_export(file: UploadFile = File(...)):
+    async def analyse_expense_export(request: Request, file: UploadFile = File(...)):
         """Screen an uploaded CSV/XLSX export in memory; uploads are not persisted."""
         filename=file.filename or "expense-export"
         try:
+            declared_size=int(request.headers.get("content-length") or 0)
+            if declared_size > MAX_UPLOAD_BYTES + 1024 * 1024:
+                raise HTTPException(413,"The upload request is too large. Files are limited to 10 MB.")
             raw=await file.read(MAX_UPLOAD_BYTES+1)
             if len(raw)>MAX_UPLOAD_BYTES:
                 raise HTTPException(413,"The file is larger than 10 MB. Split it into smaller files.")
