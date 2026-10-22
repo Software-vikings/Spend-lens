@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const state = {key:"", findings:[], transactions:[], decisions:[], claims:[], policies:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, claimPage:0, findingTotal:0, decisionTotal:0, claimTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
+  const state = {key:"", findings:[], transactions:[], decisions:[], claims:[], policies:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, claimPage:0, queuePage:0, queueTotal:0, queueItems:[], findingTotal:0, decisionTotal:0, claimTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
   const money = (n,currency="EUR") => {
     try{return new Intl.NumberFormat("en-IE",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n||0));}
     catch{return `${currency} ${Number(n||0).toFixed(2)}`;}
@@ -156,6 +156,29 @@
       });
     }catch(e){toast(e.message);}
   };
+
+  const renderExceptionQueue = () => {
+    const rows=state.queueItems||[];
+    const assigned=rows.filter(x=>x.assignee).length;
+    const overdue=rows.filter(x=>x.overdue).length;
+    $("queue-open-count").textContent=number(state.queueTotal);
+    $("queue-assigned-count").textContent=number(assigned);
+    $("queue-unassigned-count").textContent=number(Math.max(0,state.queueTotal-assigned));
+    $("queue-overdue-count").textContent=number(overdue);
+    $("queue-count").textContent=number(state.queueTotal);
+    $("queue-table").innerHTML=rows.map(x=>{const due=x.due_at?new Date(x.due_at).toLocaleString():"Not assigned";return `<tr><td><strong>${esc(x.claim_id)}</strong><div class="finding-meta">${esc(x.employee_id||"")}</div></td><td>${esc(x.merchant_name||"—")}<div class="finding-meta">${esc(x.department||"—")}</div></td><td>${money(x.amount,x.currency||"EUR")}</td><td><span class="decision-outcome review">${esc((x.resolution_status||x.current_status).replaceAll("_"," "))}</span></td><td>${esc(x.assignee||"Unassigned")}</td><td><span class="priority-tag ${esc((x.priority||"UNASSIGNED").toLowerCase())}">${esc(x.priority||"UNASSIGNED")}</span></td><td><span class="${x.overdue?"sla-overdue":""}">${esc(due)}${x.overdue?" · OVERDUE":""}</span></td><td><button class="secondary-btn small" data-queue-claim="${esc(x.claim_id)}">Open →</button></td></tr>`;}).join("")||'<tr><td colspan="8" class="empty">No exceptions match these filters.</td></tr>';
+    const start=state.queueTotal?state.queuePage*state.listPageSize+1:0;
+    $("queue-page-label").textContent=`Showing ${start}–${Math.min((state.queuePage+1)*state.listPageSize,state.queueTotal)} of ${number(state.queueTotal)}`;
+    $("queue-prev").disabled=state.queuePage===0;
+    $("queue-next").disabled=(state.queuePage+1)*state.listPageSize>=state.queueTotal;
+  };
+  const loadExceptionQueue = async () => {
+    const qs=new URLSearchParams({limit:state.listPageSize,offset:state.queuePage*state.listPageSize});
+    const status=$("queue-status").value,assignee=$("queue-assignee").value.trim(),priority=$("queue-priority").value,overdue=$("queue-overdue").value;
+    if(status)qs.set("status",status);if(assignee)qs.set("assignee",assignee);if(priority)qs.set("priority",priority);if(overdue!=="")qs.set("overdue",overdue);
+    const data=await api("/v1/exception-queue?"+qs.toString());
+    state.queueItems=data.items||[];state.queueTotal=data.total||0;renderExceptionQueue();
+  };
   const loadFindingPage = async () => {
     const status=$("finding-status").value;
     const qs=new URLSearchParams({limit:state.listPageSize,offset:state.findingPage*state.listPageSize});
@@ -247,10 +270,11 @@
   };
   const showSection = id => {
     state.currentSection=id;
-    ["overview","findings","transactions","decisions","claims","policies"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
+    ["overview","findings","transactions","decisions","claims","queue","policies"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
     document.querySelectorAll(".nav-item").forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+id));
     $("crumb-title").textContent=id[0].toUpperCase()+id.slice(1);
     if(id==="transactions")loadTransactions();
+    if(id==="queue")loadExceptionQueue().catch(e=>toast(e.message));
     if(id==="policies")loadPolicies().catch(e=>toast(e.message));
   };
   document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener("click",e=>{
@@ -263,6 +287,7 @@
   $("clear-filters").addEventListener("click",async()=>{state.filters={month:"",department:"",category:""};state.page=0;await refreshAll();});
   $("decisions-table").addEventListener("click",e=>{const b=e.target.closest("[data-decision-id]");if(b)showDecision(b.dataset.decisionId);});
   $("claims-table").addEventListener("click",e=>{const b=e.target.closest("[data-claim-id]");if(b)openClaim(b.dataset.claimId);});
+  $("queue-table").addEventListener("click",e=>{const b=e.target.closest("[data-queue-claim]");if(b)openClaim(b.dataset.queueClaim);});
   $("policies-refresh").addEventListener("click",()=>loadPolicies().catch(e=>toast(e.message)));
   $("policies-table").addEventListener("click",async e=>{
     const load=e.target.closest("[data-policy-load]");
@@ -318,6 +343,13 @@
   $("transaction-category").addEventListener("change",()=>setFilter("category",$("transaction-category").value||state.filters.category));
   $("prev-page").addEventListener("click",()=>{if(state.page>0){state.page--;loadTransactions();}});
   $("next-page").addEventListener("click",()=>{if((state.page+1)*state.pageSize<state.total){state.page++;loadTransactions();}});
+
+  $("queue-refresh").addEventListener("click",()=>loadExceptionQueue().catch(e=>toast(e.message)));
+  ["queue-status","queue-priority","queue-overdue"].forEach(id=>$(id).addEventListener("change",()=>{state.queuePage=0;loadExceptionQueue().catch(e=>toast(e.message));}));
+  let queueSearchTimer=null;
+  $("queue-assignee").addEventListener("input",()=>{clearTimeout(queueSearchTimer);queueSearchTimer=setTimeout(()=>{state.queuePage=0;loadExceptionQueue().catch(e=>toast(e.message));},300);});
+  $("queue-prev").addEventListener("click",()=>{if(state.queuePage>0){state.queuePage--;loadExceptionQueue().catch(e=>toast(e.message));}});
+  $("queue-next").addEventListener("click",()=>{if((state.queuePage+1)*state.listPageSize<state.queueTotal){state.queuePage++;loadExceptionQueue().catch(e=>toast(e.message));}});
   $("drawer-close").addEventListener("click",()=>$("drawer-backdrop").classList.add("hidden"));
   $("drawer-backdrop").addEventListener("click",e=>{if(e.target===$("drawer-backdrop"))$("drawer-backdrop").classList.add("hidden");});
   const saved=sessionStorage.getItem("spendlens-key");if(saved){$("api-key").value=saved;connect();}
