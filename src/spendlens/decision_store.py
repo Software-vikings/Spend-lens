@@ -366,7 +366,7 @@ def assign_claim(db_path: str | Path, claim_id: str, assignee: str,
 def list_exception_queue(db_path: str | Path, status: str | None = None,
                          assignee: str | None = None, priority: str | None = None,
                          overdue: bool | None = None, limit: int = 50,
-                         offset: int = 0) -> dict:
+                         offset: int = 0, sort: str = "priority") -> dict:
     now = datetime.now(timezone.utc).isoformat()
     clauses = ["c.current_status IN ('REVIEW','INSUFFICIENT_DATA')"]
     params = []
@@ -386,6 +386,13 @@ def list_exception_queue(db_path: str | Path, status: str | None = None,
         clauses.append("(a.due_at IS NULL OR a.due_at >= ?)")
         params.append(now)
     where = " WHERE " + " AND ".join(clauses)
+    order_by = {
+        "priority": "CASE a.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, a.due_at IS NULL, a.due_at, c.created_at",
+        "sla": "a.due_at IS NULL, a.due_at, CASE a.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, c.created_at",
+        "newest": "c.created_at DESC"
+    }.get(sort)
+    if order_by is None:
+        raise ValueError("Sort must be priority, sla or newest")
     joins = """ FROM expense_claims c
       LEFT JOIN (SELECT claim_id,new_status FROM (
         SELECT claim_id,new_status,ROW_NUMBER() OVER(PARTITION BY claim_id ORDER BY created_at DESC,rowid DESC) rn
@@ -407,7 +414,7 @@ def list_exception_queue(db_path: str | Path, status: str | None = None,
           a.assignee,a.priority,a.sla_hours,a.due_at,a.assigned_by,a.note assignment_note,
           a.created_at assigned_at,
           CASE WHEN a.due_at IS NOT NULL AND a.due_at < ? THEN 1 ELSE 0 END overdue
-        """ + joins + where + " ORDER BY CASE a.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'NORMAL' THEN 3 WHEN 'LOW' THEN 4 ELSE 5 END, a.due_at IS NULL, a.due_at, c.created_at LIMIT ? OFFSET ?",
+        """ + joins + where + " ORDER BY " + order_by + " LIMIT ? OFFSET ?",
           [now] + params + [limit, offset]).fetchall()
     return {"total": total, "limit": limit, "offset": offset,
             "metrics": {"assigned": aggregate["assigned_count"] or 0,
