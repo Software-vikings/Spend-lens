@@ -199,7 +199,8 @@ def evaluate_expense(expense: dict, policy: dict) -> dict:
         needs_review = True
         checks.append(_result("RISK-001", "Duplicate claim signal", "REVIEW",
             "A possible duplicate was detected. This is a review signal, not an automatic rejection.",
-            {"duplicate_suspected": True}, "REVIEW"))
+            {"duplicate_suspected": True,
+             "match": expense.get("duplicate_match")}, "REVIEW"))
     else:
         checks.append(_result("RISK-001", "Duplicate claim signal", "PASS",
             "No duplicate signal was supplied.", {"duplicate_suspected": False}))
