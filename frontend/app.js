@@ -134,15 +134,26 @@
     const q=$("transaction-search").value.toLowerCase();
     const rows=state.transactions.filter(x=>[x.transaction_id,x.merchant_name,x.employee_id,x.department,x.category].join(" ").toLowerCase().includes(q));
     $("transactions-table").innerHTML=rows.map(x=>`<tr class="transaction-row" data-transaction-id="${esc(x.transaction_id)}" tabindex="0"><td>${esc(x.transaction_date)}</td><td><strong>${esc(x.merchant_name)}</strong><div class="finding-meta">${esc(x.merchant_id)}</div></td><td>${esc(x.department)}</td><td>${esc(x.category)}</td><td>${esc(x.employee_id)}</td><td class="right"><strong>${money(x.amount)}</strong></td></tr>`).join("")||'<tr><td colspan="6" class="empty">No matching transactions</td></tr>';
-    $("transactions-table").querySelectorAll("[data-transaction-id]").forEach(el=>el.addEventListener("click",()=>openTransaction(state.transactions.find(x=>x.transaction_id===el.dataset.transactionId))));
+    $("transactions-table").querySelectorAll("[data-transaction-id]").forEach(el=>{
+      const open=()=>openTransaction(state.transactions.find(x=>x.transaction_id===el.dataset.transactionId));
+      el.addEventListener("click",open);
+      el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open();}});
+    });
     $("transaction-page-label").textContent=`Showing ${state.total?state.page*state.pageSize+1:0}–${Math.min((state.page+1)*state.pageSize,state.total)} of ${number(state.total)}`;
     $("prev-page").disabled=state.page===0;$("next-page").disabled=(state.page+1)*state.pageSize>=state.total;
   };
   const openTransaction = tx => {
     if(!tx)return;
-    $("finding-detail").innerHTML=`<div class="eyebrow">TRANSACTION DETAIL</div><h2>${esc(tx.merchant_name)}</h2><div class="detail-type">${esc(tx.transaction_id)} · ${esc(tx.transaction_date)}</div><div class="detail-amount">${money(tx.amount)}</div><div class="detail-section"><h3>Transaction context</h3><div class="detail-grid">${Object.entries(tx).map(([k,v])=>`<div class="detail-field"><small>${esc(k.replaceAll("_"," "))}</small><b>${esc(v)}</b></div>`).join("")}</div></div><button class="secondary-btn" id="transaction-context-filter">Filter dashboard to this department</button>`;
+    const fields=[
+      ["Transaction reference",tx.transaction_id],["Date",tx.transaction_date],
+      ["Merchant",tx.merchant_name],["Merchant reference",tx.merchant_id],
+      ["Employee reference",tx.employee_id],["Department",tx.department],
+      ["Category",tx.category],["Payment method",tx.payment_method],
+      ["Currency",tx.currency]
+    ];
+    $("finding-detail").innerHTML=`<div class="eyebrow">LEDGER RECORD</div><h2>${esc(tx.merchant_name)}</h2><div class="detail-type">Transaction ${esc(tx.transaction_id)}</div><div class="detail-amount">${money(tx.amount)}</div><div class="detail-section"><h3>Transaction information</h3><div class="detail-grid">${fields.map(([k,v])=>`<div class="detail-field"><small>${esc(k)}</small><b>${esc(v??"Not recorded")}</b></div>`).join("")}</div></div><div class="detail-section"><h3>What this record means</h3><p class="decision-summary">This is a synthetic card/expense transaction record. It is not, by itself, an employee reimbursement claim and does not contain an attached receipt or approval decision.</p></div><div class="detail-section"><h3>Explore related spend</h3><button class="secondary-btn" id="transaction-context-filter">Filter dashboard to ${esc(tx.department)}</button></div>`;
     $("drawer-backdrop").classList.remove("hidden");
-    $("transaction-context-filter").addEventListener("click",()=>{ $("drawer-backdrop").classList.add("hidden");setFilter("department",tx.department);showSection("overview");});
+    $("transaction-context-filter").addEventListener("click",()=>{ $("drawer-backdrop").classList.add("hidden");state.filters.department=tx.department;state.page=0;refreshAll().then(()=>showSection("overview"));});
   };
   const openFinding = async id => {
     try{
@@ -182,7 +193,6 @@
     e.preventDefault();
     const form=new FormData(e.currentTarget);
     const amount=Number(form.get("amount"));
-    const receiptProvided=form.get("receipt_provided")==="on";
     const receiptStatus=String(form.get("receipt_status"));
     const receipt={provided:receiptStatus!=="missing",readable:receiptStatus==="provided",receipt_id:String(form.get("receipt_id")||"").trim()||null,total:String(form.get("receipt_total")||"").trim()||null};
     const expense={expense_id:String(form.get("expense_id")).trim(),employee_id:String(form.get("employee_id")).trim(),merchant_name:String(form.get("merchant_name")).trim(),department:String(form.get("department")).trim(),amount:amount,currency:form.get("currency"),category:form.get("category"),transaction_date:form.get("transaction_date"),business_purpose:String(form.get("business_purpose")).trim(),receipt,duplicate_suspected:form.get("duplicate_suspected")==="on"};
