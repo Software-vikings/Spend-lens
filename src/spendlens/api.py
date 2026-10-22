@@ -192,7 +192,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
 
     @app.post("/v1/imports/analyze")
     async def analyse_expense_export(request: Request, file: UploadFile = File(...)):
-        """Screen an uploaded CSV/XLSX export in memory; uploads are not persisted."""
+        """Screen a CSV/XLSX export during the request; no application import record is persisted."""
         filename=file.filename or "expense-export"
         try:
             declared_size=int(request.headers.get("content-length") or 0)
