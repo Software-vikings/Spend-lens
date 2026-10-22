@@ -104,18 +104,25 @@ def evaluate_expense(expense: dict, policy: dict) -> dict:
         checks.append(_result("INPUT-002", "Expense date", "PASS",
             "Expense date is valid and is not in the future.", {"date": expense["transaction_date"]}))
 
-    if expense.get("currency") and (len(str(expense["currency"])) != 3 or not str(expense["currency"]).isalpha()):
+    currency = expense.get("currency")
+    if not currency:
+        insufficient = True
+        checks.append(_result("POL-001", "Policy currency", "INSUFFICIENT",
+            "Expense currency is missing; the system cannot compare it with the policy currency.",
+            {"policy_currency": policy["currency"]}, "INSUFFICIENT_DATA"))
+    elif len(str(currency)) != 3 or not str(currency).isalpha() or not str(currency).isupper():
         insufficient = True
         checks.append(_result("INPUT-003", "Currency format", "INSUFFICIENT",
-            "Currency must be a three-letter ISO-style code.", {"currency": expense["currency"]}, "INSUFFICIENT_DATA"))
-    elif expense.get("currency") and expense["currency"] != policy["currency"]:
+            "Currency must be a three-letter uppercase ISO-style code.",
+            {"currency": currency}, "INSUFFICIENT_DATA"))
+    elif currency != policy["currency"]:
         needs_review = True
         checks.append(_result("POL-001", "Policy currency", "REVIEW",
             "Expense currency differs from the policy currency; conversion is not configured.",
-            {"expense_currency": expense["currency"], "policy_currency": policy["currency"]}, "REVIEW"))
+            {"expense_currency": currency, "policy_currency": policy["currency"]}, "REVIEW"))
     else:
         checks.append(_result("POL-001", "Policy currency", "PASS",
-            "Expense currency matches the policy currency.", {"currency": expense.get("currency")}))
+            "Expense currency matches the policy currency.", {"currency": currency}))
 
     category = expense.get("category")
     if category in policy["blocked_categories"]:
