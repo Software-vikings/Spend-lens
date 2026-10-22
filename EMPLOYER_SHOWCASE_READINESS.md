@@ -130,3 +130,14 @@ The product acceptance criteria and rebuild sequence are now defined in [PRODUCT
 
 
 - Initial decision workbench added in the rebuild branch: synthetic expense form, API evaluation, persisted decision queue and rule-by-rule explanation. This is not a full dashboard rebuild; the old monolithic UI state architecture and manual browser verification remain open.
+
+
+## CI verification update — 22 October 2026
+
+- GitHub Actions SpendLens CI run #65 (ID 39757279432) passed on the current PR head.
+- Pytest result: 44 passed, 1 deprecation warning, 1.51 seconds.
+- Synthetic pipeline, multi-seed validation, Python compilation and dashboard JavaScript syntax checks also passed.
+- The first deterministic decision-engine/API/workbench slice is now verified by hosted CI. This does not establish browser correctness or production suitability.
+- Product completion is re-scored at **49/100**, using the rubric in PRODUCT_SCOPE_AND_REBUILD_PLAN.md. The earlier 24/100 remains the pre-implementation baseline; 73% remains withdrawn.
+- Still open: first-class claim/evidence model, policy administration, full decision audit/override/re-evaluation lifecycle, complete state-driven dashboard and chart drill-through, browser tests, clean-clone walkthrough, Docker and security/dependency verification.
+- Draft PR #3 remains open and unmerged: https://github.com/Software-vikings/Spend-lens/pull/3
