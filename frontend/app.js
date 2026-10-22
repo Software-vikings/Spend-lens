@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const state = {key:"", findings:[], transactions:[], page:0, pageSize:25, total:0, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
+  const state = {key:"", findings:[], transactions:[], decisions:[], page:0, pageSize:25, total:0, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
   const money = n => new Intl.NumberFormat("en-IE",{style:"currency",currency:"EUR",maximumFractionDigits:0}).format(Number(n||0));
   const number = n => new Intl.NumberFormat("en-US").format(Number(n||0));
   const esc = v => String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -55,8 +55,9 @@
       await loadFilterOptions();
       const qs=filterQuery();
       const suffix=qs?`?${qs}`:"";
-      const [summary,overview,findings]=await Promise.all([api("/v1/summary"+suffix),api("/v1/analytics/overview"+suffix),api("/v1/findings?limit=100")]);
-      state.overview=overview;state.findings=findings.items||[];
+      const [summary,overview,findings,decisions]=await Promise.all([api("/v1/summary"+suffix),api("/v1/analytics/overview"+suffix),api("/v1/findings?limit=100"),api("/v1/decisions?limit=100")]);
+      state.overview=overview;state.findings=findings.items||[];state.decisions=decisions.items||[];
+      $("decision-count").textContent=number(decisions.total||0);renderDecisions();
       $("total-spend").textContent=money(summary.total_spend);
       $("transaction-count").textContent=number(summary.transaction_count);
       const open=Object.entries(summary.findings_by_status||{}).filter(([k])=>["new","under_review"].includes(k)).reduce((a,[,v])=>a+v,0);
@@ -102,6 +103,16 @@
     const data=await api("/v1/transactions?"+qs.toString());state.transactions=data.items||[];state.total=data.total||0;
     renderTransactions();
   };
+  const renderDecisions = () => {
+    $("decisions-table").innerHTML=state.decisions.map(d=>`<tr><td><strong>${esc(d.expense_id)}</strong><div class="finding-meta">${esc(d.decision_id.slice(0,12))}</div></td><td><span class="decision-outcome ${esc(d.outcome.toLowerCase())}">${esc(d.outcome.replaceAll("_"," "))}</span></td><td>${esc(d.policy_id)} · ${esc(d.policy_version)}</td><td>${esc(new Date(d.created_at).toLocaleString())}</td><td><button class="secondary-btn small" data-decision-id="${esc(d.decision_id)}">Details →</button></td></tr>`).join("")||'<tr><td colspan="5" class="empty">No decisions have been evaluated yet</td></tr>';
+  };
+  const showDecision = async id => {
+    try {
+      const d=await api(`/v1/decisions/${encodeURIComponent(id)}`);
+      const rules=d.evaluation.evaluated_rules||[];
+      $("decision-result").innerHTML=`<div class="decision-outcome large ${esc(d.outcome.toLowerCase())}">${esc(d.outcome.replaceAll("_"," "))}</div><h3>${esc(d.expense_id)}</h3><p>${esc(d.evaluation.decision_explanation)}</p><div class="finding-meta">Policy ${esc(d.policy_id)} v${esc(d.policy_version)} · Engine v${esc(d.engine_version)}</div><div class="rule-results">${rules.map(r=>`<div class="rule-result"><div><b>${esc(r.label)}</b><span class="rule-status ${esc(r.status.toLowerCase())}">${esc(r.status)}</span></div><p>${esc(r.explanation)}</p><small>${esc(r.rule_id)} · ${esc(JSON.stringify(r.evidence||{}))}</small></div>`).join("")}</div>`;
+    } catch(e){toast(e.message);}
+  };
   const renderTransactions = () => {
     const q=$("transaction-search").value.toLowerCase();
     const rows=state.transactions.filter(x=>[x.transaction_id,x.merchant_name,x.employee_id,x.department,x.category].join(" ").toLowerCase().includes(q));
@@ -135,19 +146,34 @@
   };
   const showSection = id => {
     state.currentSection=id;
-    ["overview","findings","transactions"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
+    ["overview","findings","transactions","decisions"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
     document.querySelectorAll(".nav-item").forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+id));
     $("crumb-title").textContent=id[0].toUpperCase()+id.slice(1);
     if(id==="transactions")loadTransactions();
   };
   document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener("click",e=>{
     const id=a.getAttribute("href").slice(1);
-    if(["overview","findings","transactions"].includes(id)){e.preventDefault();showSection(id);}
+    if(["overview","findings","transactions","decisions"].includes(id)){e.preventDefault();showSection(id);}
   }));
   $("transaction-count-card").addEventListener("click",()=>showSection("transactions"));
   $("transaction-count-card").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showSection("transactions");}});
   $("view-filtered-transactions").addEventListener("click",()=>showSection("transactions"));
   $("clear-filters").addEventListener("click",async()=>{state.filters={month:"",department:"",category:""};state.page=0;await refreshAll();});
+  $("decisions-table").addEventListener("click",e=>{const b=e.target.closest("[data-decision-id]");if(b)showDecision(b.dataset.decisionId);});
+  $("decisions-refresh").addEventListener("click",async()=>{try{const d=await api("/v1/decisions?limit=100");state.decisions=d.items||[];renderDecisions();$("decision-count").textContent=number(d.total||0);}catch(e){toast(e.message);}});
+  $("expense-evaluation-form").addEventListener("submit",async e=>{
+    e.preventDefault();
+    const form=new FormData(e.currentTarget);
+    const amount=Number(form.get("amount"));
+    const receiptProvided=form.get("receipt_provided")==="on";
+    const expense={expense_id:String(form.get("expense_id")).trim(),amount:amount,currency:"EUR",category:form.get("category"),transaction_date:form.get("transaction_date"),business_purpose:String(form.get("business_purpose")).trim(),receipt:receiptProvided?{provided:true,readable:true,total:String(form.get("receipt_total")||"")}:{provided:false},duplicate_suspected:false};
+    try{
+      const result=await api("/v1/expenses/evaluate",{method:"POST",body:JSON.stringify({expense})});
+      $("decision-result").innerHTML='<div class="empty">Evaluation saved. Loading rule-level explanation…</div>';
+      const list=await api("/v1/decisions?limit=100");state.decisions=list.items||[];renderDecisions();$("decision-count").textContent=number(list.total||0);
+      await showDecision(result.decision_id);toast("Expense evaluated and decision saved.");
+    }catch(err){toast(err.message);}
+  });
   $("connect-btn").addEventListener("click",connect);$("api-key").addEventListener("keydown",e=>{if(e.key==="Enter")connect();});
   $("refresh-btn").addEventListener("click",refreshAll);$("findings-refresh").addEventListener("click",refreshAll);$("transactions-refresh").addEventListener("click",()=>loadTransactions());
   $("finding-search").addEventListener("input",renderFindings);$("finding-status").addEventListener("change",renderFindings);
