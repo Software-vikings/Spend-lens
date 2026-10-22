@@ -136,7 +136,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         return {"status":"ok","service":"spendlens-api"}
 
     @app.get("/v1/summary")
-    def summary(month:str|None=Query(None,pattern=r"^\\d{4}-\\d{2}$"),
+    def summary(month:str|None=Query(None,pattern=r"^\d{4}-\d{2}$"),
                 department:str|None=None,category:str|None=None,
                 _:str=Depends(require_role("viewer"))):
         clauses,params=transaction_filters(month,department,category)
@@ -154,7 +154,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
           "active_filters":{"month":month,"department":department,"category":category}}
 
     @app.get("/v1/analytics/overview")
-    def analytics_overview(month:str|None=Query(None,pattern=r"^\\d{4}-\\d{2}$"),
+    def analytics_overview(month:str|None=Query(None,pattern=r"^\d{4}-\d{2}$"),
                            department:str|None=None,category:str|None=None,
                            _:str=Depends(require_role("viewer"))):
         clauses,params=transaction_filters(month,department,category)
@@ -176,7 +176,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
 
     @app.get("/v1/transactions")
     def transactions(limit:int=Query(100,ge=1,le=500),offset:int=Query(0,ge=0),
-        month:str|None=Query(None,pattern=r"^\\d{4}-\\d{2}$"),
+        month:str|None=Query(None,pattern=r"^\d{4}-\d{2}$"),
         department:str|None=None,category:str|None=None,q:str|None=Query(None,max_length=120),
         _:str=Depends(require_role("viewer"))):
         clauses,params=transaction_filters(month,department,category)
