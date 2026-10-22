@@ -8,7 +8,7 @@ SpendLens is being rebuilt to evaluate synthetic expense claims against explicit
 
 ## Current implementation status
 
-The repository currently generates synthetic transactions, screens statistical/heuristic signals, stores generic findings and serves a basic overview/findings/transactions dashboard. **It does not yet automatically determine whether an expense should be approved or rejected against a company policy.** There is no first-class expense-claim/evidence model or versioned policy engine. The current findings are not approval decisions.
+The repository's main-branch foundation generates synthetic transactions, screens statistical/heuristic signals and serves a basic overview/findings/transactions dashboard. The rebuild branch now adds an initial deterministic policy evaluator, a synthetic versioned policy, persisted decision APIs and an expense-decision workbench. **This is a first vertical slice, not a complete product:** claim/evidence domain modelling, policy management, authorised overrides, end-to-end lifecycle and the full state-driven dashboard rebuild remain open. Existing findings are not approval decisions.
 
 The product scope, code audit, target decision contract, dashboard acceptance criteria and phased rebuild are documented in [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md). The former 73% showcase score has been withdrawn because it measured repository completeness rather than the intended product outcome. Current evidence-based product completion baseline: **24/100**.
 
