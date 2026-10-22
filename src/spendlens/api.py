@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
 from .decision_engine import evaluate_expense
+from .policy_store import init_policy_registry, create_policy_version, activate_policy_version, get_active_policy, list_policy_versions, get_policy_version
 from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate
 
 logger = logging.getLogger("spendlens.api")
@@ -215,6 +216,39 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         return {"transaction": dict(transaction), "related_findings": [dict(row) for row in linked],
                 "relationship_note": "Findings are linked only when their source record contains this exact transaction ID. Expense claims and decisions are separate records until an explicit source relationship is supplied."}
 
+    @app.get("/v1/policies")
+    def policies(_:str=Depends(require_role("viewer"))):
+        if not db_path.exists(): raise HTTPException(503,"Database not found")
+        init_decisions(db_path)
+        seed_path=ROOT/"policies"/"demo_policy.json"
+        init_policy_registry(db_path,json.loads(seed_path.read_text()) if seed_path.exists() else None)
+        return {"items":list_policy_versions(db_path)}
+
+    @app.get("/v1/policies/{policy_id}/{version}")
+    def policy_detail(policy_id:str,version:str,_:str=Depends(require_role("viewer"))):
+        init_decisions(db_path)
+        seed_path=ROOT/"policies"/"demo_policy.json"
+        init_policy_registry(db_path,json.loads(seed_path.read_text()) if seed_path.exists() else None)
+        item=get_policy_version(db_path,policy_id,version)
+        if item is None: raise HTTPException(404,"Policy version not found")
+        return item
+
+    @app.post("/v1/policies",status_code=201)
+    def create_policy(body:dict,actor:str=Depends(require_role("admin"))):
+        init_decisions(db_path)
+        seed_path=ROOT/"policies"/"demo_policy.json"
+        init_policy_registry(db_path,json.loads(seed_path.read_text()) if seed_path.exists() else None)
+        try: return create_policy_version(db_path,body,actor)
+        except ValueError as exc: raise HTTPException(409 if "already exists" in str(exc) else 422,str(exc)) from exc
+
+    @app.post("/v1/policies/{policy_id}/{version}/activate")
+    def activate_policy(policy_id:str,version:str,actor:str=Depends(require_role("admin"))):
+        init_decisions(db_path)
+        seed_path=ROOT/"policies"/"demo_policy.json"
+        init_policy_registry(db_path,json.loads(seed_path.read_text()) if seed_path.exists() else None)
+        try: return activate_policy_version(db_path,policy_id,version,actor)
+        except LookupError as exc: raise HTTPException(404,str(exc)) from exc
+
     @app.post("/v1/expenses/evaluate")
     def evaluate_expense_route(body: ExpenseEvaluationRequest,
                                idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
@@ -226,7 +260,10 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         if not policy_path.exists():
             raise HTTPException(503, "Configured demo policy is missing")
         try:
-            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            seed_policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            init_policy_registry(db_path,seed_policy)
+            policy = get_active_policy(db_path)
+            if policy is None: raise HTTPException(503,"No active expense policy")
             expense = dict(body.expense)
             duplicate_match = find_potential_duplicate(db_path, expense)
             if duplicate_match:
