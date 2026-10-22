@@ -221,7 +221,11 @@ def list_decisions(db_path: str | Path, outcome: str | None = None,
             "SELECT decision_id,expense_id,outcome,policy_id,policy_version,engine_version,created_at "
             "FROM expense_decisions" + where + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
             params + [limit, offset]).fetchall()
-    return {"total": total, "limit": limit, "offset": offset, "items": [dict(row) for row in rows]}
+    return {"total": total, "limit": limit, "offset": offset,
+            "metrics": {"assigned": aggregate["assigned_count"] or 0,
+                        "unassigned": aggregate["unassigned_count"] or 0,
+                        "overdue": aggregate["overdue_count"] or 0},
+            "items": [dict(row) for row in rows]}
 
 
 def get_decision(db_path: str | Path, decision_id: str) -> dict | None:
@@ -271,12 +275,18 @@ def get_claim(db_path: str | Path, claim_id: str) -> dict | None:
             "SELECT resolution_id,action,previous_status,new_status,reviewer,reason,evidence_note,created_at FROM claim_resolution_events WHERE claim_id=? ORDER BY created_at,rowid",
             (claim_id,)
         ).fetchall()
+        assignments = conn.execute(
+            "SELECT assignment_id,assignee,priority,sla_hours,due_at,assigned_by,note,created_at FROM claim_assignment_events WHERE claim_id=? ORDER BY created_at,rowid",
+            (claim_id,)
+        ).fetchall()
     item = dict(claim)
     item["current_payload"] = json.loads(item["current_payload"])
     item["submissions"] = [{**dict(row), "payload": json.loads(row["payload"])} for row in submissions]
     item["evidence"] = [{**dict(row), "metadata": json.loads(row["metadata"])} for row in evidence]
     item["resolution_history"] = [dict(row) for row in resolutions]
     item["resolution_status"] = resolutions[-1]["new_status"] if resolutions else None
+    item["assignment_history"] = [dict(row) for row in assignments]
+    item["current_assignment"] = dict(assignments[-1]) if assignments else None
     return item
 
 def resolve_claim(db_path: str | Path, claim_id: str, action: str,
@@ -341,8 +351,14 @@ def assign_claim(db_path: str | Path, claim_id: str, assignee: str,
              "created_at": now.isoformat()}
     with connect(db_path) as conn:
         conn.execute("BEGIN IMMEDIATE")
-        if conn.execute("SELECT 1 FROM expense_claims WHERE claim_id=?", (claim_id,)).fetchone() is None:
+        claim = conn.execute("SELECT current_status FROM expense_claims WHERE claim_id=?", (claim_id,)).fetchone()
+        if claim is None:
             raise LookupError("Expense claim not found")
+        if claim["current_status"] not in ("REVIEW", "INSUFFICIENT_DATA"):
+            raise ValueError("Only REVIEW or INSUFFICIENT_DATA claims can be assigned")
+        terminal = conn.execute("SELECT new_status FROM claim_resolution_events WHERE claim_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1", (claim_id,)).fetchone()
+        if terminal and terminal["new_status"] in ("HUMAN_APPROVED", "HUMAN_REJECTED"):
+            raise ValueError("Terminally resolved claims cannot be assigned")
         conn.execute("""INSERT INTO claim_assignment_events
           (assignment_id,claim_id,assignee,priority,sla_hours,due_at,assigned_by,note,created_at)
           VALUES(?,?,?,?,?,?,?,?,?)""",
@@ -381,7 +397,13 @@ def list_exception_queue(db_path: str | Path, status: str | None = None,
         SELECT *,ROW_NUMBER() OVER(PARTITION BY claim_id ORDER BY created_at DESC,rowid DESC) rn
         FROM claim_assignment_events) WHERE rn=1) a ON a.claim_id=c.claim_id"""
     with connect(db_path) as conn:
-        total = conn.execute("SELECT COUNT(*) n" + joins + where, params).fetchone()["n"]
+        aggregate = conn.execute(
+            "SELECT COUNT(*) total, SUM(CASE WHEN a.assignee IS NOT NULL THEN 1 ELSE 0 END) assigned_count, "
+            "SUM(CASE WHEN a.assignee IS NULL THEN 1 ELSE 0 END) unassigned_count, "
+            "SUM(CASE WHEN a.due_at IS NOT NULL AND a.due_at < ? THEN 1 ELSE 0 END) overdue_count"
+            + joins + where, [now] + params
+        ).fetchone()
+        total = aggregate["total"] or 0
         rows = conn.execute("""SELECT c.claim_id,c.employee_id,c.merchant_name,c.department,
           c.amount,c.currency,c.category,c.current_status,c.created_at,c.updated_at,
           COALESCE(r.new_status,c.current_status) resolution_status,
