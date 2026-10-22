@@ -16,3 +16,5 @@ jobs:
       - run: PYTHONPATH=src python -m spendlens.pipeline
       - run: PYTHONPATH=src python -m spendlens.validation
       - run: python -m compileall -q src
+      - name: Check dashboard JavaScript syntax
+        run: node --check frontend/app.js
