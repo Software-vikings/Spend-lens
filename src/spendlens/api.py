@@ -101,6 +101,25 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         init_phase4(db_path)
         return connect(db_path)
 
+    def transaction_filters(month: str | None, department: str | None,
+                            category: str | None) -> tuple[list[str], list[str]]:
+        """Build parameterised filters shared by dashboard and ledger endpoints."""
+        clauses: list[str] = []
+        params: list[str] = []
+        if month:
+            clauses.append("substr(transaction_date,1,7)=?")
+            params.append(month)
+        if department:
+            clauses.append("department=?")
+            params.append(department)
+        if category:
+            clauses.append("category=?")
+            params.append(category)
+        return clauses, params
+
+    def where_clause(clauses: list[str]) -> str:
+        return (" WHERE " + " AND ".join(clauses)) if clauses else ""
+
     frontend_dir = ROOT / "frontend"
 
     @app.get("/", include_in_schema=False)
@@ -117,47 +136,59 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         return {"status":"ok","service":"spendlens-api"}
 
     @app.get("/v1/summary")
-    def summary(_:str=Depends(require_role("viewer"))):
+    def summary(month:str|None=Query(None,pattern=r"^\\d{4}-\\d{2}$"),
+                department:str|None=None,category:str|None=None,
+                _:str=Depends(require_role("viewer"))):
+        clauses,params=transaction_filters(month,department,category)
+        where=where_clause(clauses)
         with db() as c:
-            tx=c.execute("SELECT COUNT(*) n,COALESCE(SUM(amount),0) spend FROM transactions").fetchone()
+            tx=c.execute("SELECT COUNT(*) n,COALESCE(SUM(amount),0) spend FROM transactions"+where,params).fetchone()
+            # Findings are deliberately global until findings carry transaction-level
+            # dimension keys. Do not imply that these counts are cross-filtered.
             findings=c.execute("SELECT review_status,COUNT(*) n FROM findings GROUP BY review_status").fetchall()
             types=c.execute("SELECT finding_type,COUNT(*) n FROM findings GROUP BY finding_type").fetchall()
         return {"transaction_count":tx["n"],"total_spend":round(tx["spend"],2),
           "findings_by_status":{r["review_status"]:r["n"] for r in findings},
           "findings_by_type":{r["finding_type"]:r["n"] for r in types},
-          "currency":"EUR","data_note":"Synthetic demonstration data."}
+          "currency":"EUR","data_note":"Synthetic demonstration data.",
+          "active_filters":{"month":month,"department":department,"category":category}}
 
     @app.get("/v1/analytics/overview")
-    def analytics_overview(_:str=Depends(require_role("viewer"))):
+    def analytics_overview(month:str|None=Query(None,pattern=r"^\\d{4}-\\d{2}$"),
+                           department:str|None=None,category:str|None=None,
+                           _:str=Depends(require_role("viewer"))):
+        clauses,params=transaction_filters(month,department,category)
+        where=where_clause(clauses)
         with db() as c:
-            monthly=c.execute("""SELECT substr(transaction_date,1,7) month,
+            monthly=c.execute(f"""SELECT substr(transaction_date,1,7) month,
                 ROUND(SUM(amount),2) spend,COUNT(*) transaction_count
-                FROM transactions GROUP BY 1 ORDER BY 1""").fetchall()
-            departments=c.execute("""SELECT department,ROUND(SUM(amount),2) spend,
-                COUNT(*) transaction_count FROM transactions GROUP BY department
-                ORDER BY spend DESC""").fetchall()
-            categories=c.execute("""SELECT category,ROUND(SUM(amount),2) spend,
-                COUNT(*) transaction_count FROM transactions GROUP BY category
-                ORDER BY spend DESC LIMIT 8""").fetchall()
+                FROM transactions{where} GROUP BY 1 ORDER BY 1""",params).fetchall()
+            departments=c.execute(f"""SELECT department,ROUND(SUM(amount),2) spend,
+                COUNT(*) transaction_count FROM transactions{where} GROUP BY department
+                ORDER BY spend DESC""",params).fetchall()
+            categories=c.execute(f"""SELECT category,ROUND(SUM(amount),2) spend,
+                COUNT(*) transaction_count FROM transactions{where} GROUP BY category
+                ORDER BY spend DESC LIMIT 8""",params).fetchall()
         return {"monthly":[dict(r) for r in monthly],
                 "departments":[dict(r) for r in departments],
-                "categories":[dict(r) for r in categories],"currency":"EUR"}
+                "categories":[dict(r) for r in categories],"currency":"EUR",
+                "active_filters":{"month":month,"department":department,"category":category}}
 
     @app.get("/v1/transactions")
     def transactions(limit:int=Query(100,ge=1,le=500),offset:int=Query(0,ge=0),
+        month:str|None=Query(None,pattern=r"^\\d{4}-\\d{2}$"),
         department:str|None=None,category:str|None=None,q:str|None=Query(None,max_length=120),
         _:str=Depends(require_role("viewer"))):
-        clauses=[];params=[]
-        if department: clauses.append("department=?");params.append(department)
-        if category: clauses.append("category=?");params.append(category)
+        clauses,params=transaction_filters(month,department,category)
         if q and q.strip():
             clauses.append("(transaction_id LIKE ? OR merchant_name LIKE ? OR employee_id LIKE ? OR department LIKE ? OR category LIKE ?)")
             term=f"%{q.strip()}%";params.extend([term]*5)
-        where=(" WHERE "+" AND ".join(clauses)) if clauses else ""
+        where=where_clause(clauses)
         with db() as c:
             total=c.execute("SELECT COUNT(*) n FROM transactions"+where,params).fetchone()["n"]
             rows=c.execute("SELECT transaction_id,transaction_date,employee_id,department,merchant_id,merchant_name,category,amount,currency,payment_method FROM transactions"+where+" ORDER BY transaction_date DESC,transaction_id LIMIT ? OFFSET ?",params+[limit,offset]).fetchall()
-        return {"total":total,"limit":limit,"offset":offset,"items":[dict(r) for r in rows]}
+        return {"total":total,"limit":limit,"offset":offset,"items":[dict(r) for r in rows],
+                "active_filters":{"month":month,"department":department,"category":category}}
 
     @app.get("/v1/findings")
     def findings(status:ReviewStatus|None=None,finding_type:str|None=None,
