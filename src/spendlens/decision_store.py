@@ -29,6 +29,33 @@ def init_decisions(db_path: str | Path) -> None:
         """)
 
 
+
+def find_potential_duplicate(db_path: str | Path, expense: dict) -> dict | None:
+    """Find an exact high-similarity prior claim candidate; never infer fraud.
+
+    A match is based on employee, merchant, amount, currency and transaction
+    date. It is a conservative review signal and can include legitimate repeats.
+    """
+    identity = ("employee_id", "merchant_name", "amount", "currency", "transaction_date")
+    if any(expense.get(key) in (None, "") for key in identity):
+        return None
+    with connect(db_path) as conn:
+        rows = conn.execute(
+            "SELECT expense_id, expense_payload FROM expense_decisions "
+            "ORDER BY created_at DESC LIMIT 500"
+        ).fetchall()
+    for row in rows:
+        try:
+            prior = json.loads(row["expense_payload"])
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if all(str(prior.get(key, "")).strip().casefold() ==
+               str(expense.get(key, "")).strip().casefold() for key in identity):
+            return {"prior_expense_id": row["expense_id"],
+                    "match_fields": list(identity)}
+    return None
+
+
 def save_decision(db_path: str | Path, expense: dict, evaluation: dict) -> dict:
     decision = {
         "decision_id": str(uuid.uuid4()),
