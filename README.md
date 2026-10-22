@@ -1,46 +1,38 @@
 # SpendLens
 
-**An early-stage automated expense-decision prototype under rebuild.**
+**Policy-based expense decision and exception-operations prototype.**
 
-SpendLens is being rebuilt to evaluate synthetic expense claims against explicit, configurable company policy and return explainable approval, rejection, review or insufficient-evidence outcomes. The current codebase is a foundation—not yet that complete decision system. It is an independent portfolio project and is not connected to Pleo, a bank or any real financial institution.
+SpendLens evaluates submitted expense claims against a versioned, configurable **synthetic demonstration policy**. It returns one of four outcomes—`APPROVE`, `REJECT`, `REVIEW` or `INSUFFICIENT_DATA`—with rule-level explanations, persists decisions, and routes exceptions through an assignment and human-resolution workflow.
 
-> **Demo data only:** all transactions are synthetic and denominated in EUR. Findings are screening signals, not fraud verdicts, policy determinations or proof of savings.
+This is an independent portfolio project. It is **not** connected to Pleo, a bank, an accounting platform or any real financial institution.
 
-## Current implementation status
+> **Demo-data boundary:** the transaction ledger and example policy are synthetic. Findings and duplicate candidates are screening signals, not proof of fraud, policy violations or savings. Do not use real employee or financial data.
 
-The repository's main-branch foundation generates synthetic transactions, screens statistical/heuristic signals and serves a basic overview/findings/transactions dashboard. The rebuild branch now adds an initial deterministic policy evaluator, a synthetic versioned policy, persisted decision APIs and an expense-decision workbench. The initial decision-engine slice is CI-verified. The latest micro-detail dashboard and claim-intake pass is now CI-verified: 48 tests passed, alongside the synthetic pipeline, multi-seed validation, Python compilation and JavaScript syntax checks. Browser-level verification remains pending. **This is a first vertical slice, not a complete product:** claim/evidence domain modelling, policy management, authorised overrides, end-to-end lifecycle and the full state-driven dashboard rebuild remain open. Existing findings are not approval decisions.
+## Implemented capabilities
 
-The product scope, code audit, target decision contract, dashboard acceptance criteria and phased rebuild are documented in [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md). The former 73% showcase score has been withdrawn because it measured repository completeness rather than the intended product outcome. Current evidence-based product completion baseline: **24/100**.
+- Deterministic expense evaluation against versioned policy documents, with explicit rule results and explanations.
+- Four distinct decision outcomes; missing or unreliable required information is not silently approved.
+- Persisted decisions, claims, submission history and receipt/evidence metadata.
+- Decision history with policy and engine version references.
+- Policy version creation and activation, with admin-only controls and audit events.
+- Exception queue with assignment/reassignment, priority, SLA deadlines, queue-wide metrics, sorting, filtering and pagination.
+- Human exception actions: request information, approve or reject. Human resolution history is preserved separately from the original automated outcome; terminal resolutions cannot be overwritten.
+- Transaction dashboard with month, department and category filtering; spend charts, ledger search, pagination and transaction detail.
+- Findings review workspace and audit trail for policy administration, claim assignment/resolution and finding review actions.
+- Exact transaction-to-finding drill-through only where the source finding carries the matching transaction ID.
+- API-key roles, input validation, parameterised SQL, request throttling, security headers and database-backed idempotency for expense evaluation.
+- Automated tests for decision rules, role access, audit atomicity, exception lifecycle, dashboard aggregates, pagination and concurrent idempotent submissions.
 
-## Existing foundation (not the finished product)
+## Decision semantics
 
-- Generates reproducible synthetic company expense records and stores them in SQLite.
-- Screens unusually high transactions against merchant/category peers using median absolute deviation (MAD); this is a risk signal, not a policy decision.
-- Identifies recurring-payment changes, merchant amount drift, duplicate candidates and fragmented-purchase patterns.
-- Analyses monthly department spend and spend per employee using explicit headcount inputs.
-- Exposes authenticated FastAPI endpoints for summary, analytics, transactions, findings and analyst review.
-- Provides a basic browser dashboard with spend overview, findings queue, transaction explorer and review history.
-- Includes an initial month/department/category cross-filter implementation; browser-level behaviour is not yet verified and the UI is scheduled for a state-driven rebuild.
-- Produces SQL analytics, Power BI-ready CSV exports and a multi-seed validation report.
+| Outcome | Meaning |
+|---|---|
+| `APPROVE` | Required inputs/evidence are present and the configured policy checks pass. |
+| `REJECT` | A configured deterministic hard-stop rule is conclusively violated. |
+| `REVIEW` | An exception or ambiguous/risk signal requires human assessment. |
+| `INSUFFICIENT_DATA` | Required information is missing or not reliable enough to evaluate. |
 
-## Architecture
-
-```text
-Synthetic generator
-       |
-       v
-Validation -> SQLite database -> Detection / insight screens
-                                      |
-                                      v
-                                Persistent findings
-                                      |
-                         +------------+------------+
-                         |                         |
-                      FastAPI                 Power BI exports
-                         |
-                         v
-                 Browser analyst dashboard
-```
+An anomaly or duplicate-candidate signal does not, by itself, cause automatic rejection. The included policy is illustrative and must not be represented as any employer's actual policy.
 
 ## Run locally
 
@@ -51,7 +43,7 @@ git clone https://github.com/Software-vikings/Spend-lens.git
 cd Spend-lens
 
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 
 PYTHONPATH=src python -m spendlens.pipeline
@@ -59,52 +51,54 @@ PYTHONPATH=src python -m spendlens.validation
 PYTHONPATH=src pytest -q
 ```
 
-Create a long random API key (at least 24 characters), then start the API:
+Configure at least one long random API key (24+ characters) and start the API:
 
 ```bash
-export SPENDLENS_API_KEYS="YOUR_LONG_RANDOM_KEY:analyst"
+export SPENDLENS_API_KEYS="YOUR_LONG_RANDOM_KEY:analyst,ANOTHER_LONG_RANDOM_KEY:viewer"
 PYTHONPATH=src uvicorn spendlens.api:app --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000 and enter the API key. The dashboard stores it in the current browser tab's session storage. Do not commit real keys or use real employee/financial records.
+Open http://127.0.0.1:8000 and enter the API key. The dashboard retains it in the current browser tab's session storage. Never commit real keys.
 
-## API
+## Roles and key API areas
 
-- `GET /health` — health check
-- `GET /v1/summary` — spend and finding summary; accepts `month`, `department` and `category` filters
-- `GET /v1/analytics/overview` — monthly, department and category aggregates; accepts the same filters
-- `GET /v1/transactions` — searchable and paginated transactions; accepts the same filters
-- `POST /v1/expenses/evaluate` — analyst-only evaluation against the versioned synthetic demo policy; persists the decision
-- `GET /v1/decisions` — persisted decision history, filterable by outcome
-- `GET /v1/decisions/{decision_id}` — decision, input and rule-level explanation
-- `GET /v1/findings` — findings queue
-- `GET /v1/findings/{finding_id}` — finding detail and review history
-- `PATCH /v1/findings/{finding_id}/review` — analyst review update
+- **Viewer:** read-only access to permitted dashboard, transaction, claim, decision and queue data.
+- **Analyst:** expense evaluation, finding review and exception assignment/resolution.
+- **Admin:** policy administration and audit-event access, in addition to permitted operational actions.
 
-All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role can evaluate expenses and update finding review state. Expense evaluation is an initial vertical slice using the example policy; there is not yet a policy-management UI or complete claim lifecycle. The admin role currently has the same application permissions as analyst. The current cross-filtering applies to transaction spend, analytics and the transaction ledger. Finding counts and the findings list remain workspace-wide until every finding type has a reliable transaction-level relationship.
+Key API routes include:
 
-## Tests and CI
+- `GET /health`
+- `GET /v1/summary`, `GET /v1/analytics/overview`
+- `GET /v1/transactions`, `GET /v1/transactions/{transaction_id}`
+- `POST /v1/expenses/evaluate` (supports `Idempotency-Key`)
+- `GET /v1/decisions`, `GET /v1/decisions/{decision_id}`
+- `GET /v1/claims`, `GET /v1/claims/{claim_id}`
+- `GET /v1/exception-queue`
+- `POST /v1/claims/{claim_id}/assignment`
+- `POST /v1/claims/{claim_id}/resolution`
+- `GET /v1/policies`, `POST /v1/policies`, `POST /v1/policies/{policy_id}/{version}/activate`
+- `GET /v1/audit-events` (admin-only)
+- `GET /v1/findings`, `PATCH /v1/findings/{finding_id}/review`
 
-Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions checks out the repository, installs dependencies, runs the tests, executes the synthetic pipeline and validation, compiles Python source, and checks dashboard JavaScript syntax. **The hosted CI run for source commit `2900258` passed all steps**, including tests, pipeline and validation. Subsequent documentation updates were also checked by CI. [View GitHub Actions](https://github.com/Software-vikings/Spend-lens/actions).
+Consult the route definitions in `src/spendlens/api.py` for request schemas and supported query parameters.
 
-## Power BI
+## Verification
 
-The pipeline generates Power BI-ready CSV exports under `reports/`. See [Power BI build guide](powerbi/POWER_BI_BUILD_GUIDE.md) for the recommended semantic model, DAX measures and report pages. A native `.pbix` file is not included.
+The rebuild branch has automated coverage for the API, policy engine, exception workflow, audit history, dashboard aggregates, role permissions, idempotency and concurrent submissions. CI runs tests, the synthetic data pipeline, multi-seed validation, Python compilation and dashboard JavaScript syntax checks.
 
-## Product completion status
+Automated CI does **not** establish visual/browser acceptance, production security, deployment correctness or real-world policy effectiveness. Browser-based end-to-end verification has not been performed.
 
-**Baseline: 24/100 against the intended automated expense-decision product.** The policy model, first-class claim/evidence model and deterministic decision engine are not implemented. Existing charts and anomaly screens do not meet the product objective. See [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md) for the weighted rubric and phased exit criteria. This score is not production readiness.
+## Explicit limitations and production gaps
 
-## Evaluation limitations
+- Synthetic transactions and a synthetic example policy only; no employer policy discovery or real-world policy validation.
+- Receipt handling stores user-entered metadata only. No file upload, OCR, authenticity checks or independent evidence verification.
+- Reviewer/assignee names are self-reported; API-key roles are not an enterprise identity system.
+- No Pleo, bank, card, ERP or accounting integrations; no payment execution.
+- No tenant isolation, SSO/MFA, distributed rate limiting, managed secrets, formal penetration test or independent security review.
+- No verified production deployment, Docker runtime validation, backup/restore exercise or operational monitoring.
+- Findings are workspace-wide where a trustworthy transaction-level relationship is unavailable; related records are not inferred from matching amounts/dates.
+- The audit trail is transactionally written for supported audited actions, but is not cryptographically tamper-evident and does not prove the identity of the named human actor.
+- No browser interaction suite or visual regression evidence is claimed.
 
-The validation dataset is synthetic and includes injected scenarios authored alongside the detector. Precision/recall figures measure recovery of those synthetic high-value outlier scenarios only; they do not estimate real-world fraud performance. The current peer baseline is in-sample and can use later-dated peer transactions, creating temporal leakage. A flag is not proof of fraud, policy violation, waste or supplier overcharging.
-
-## Security boundaries
-
-This is a portfolio prototype, not a production-certified financial control platform. API keys are static configuration values, rate limiting is in-memory and per process, and there is no tenant isolation, SSO/MFA, formal penetration test or verified cloud deployment. Do not expose publicly or load real financial data without additional security, privacy, operational and legal review. See [SECURITY.md](SECURITY.md).
-
-
-The rebuild branch now has improved faceted chart queries, a more complete claim-intake form, explicit receipt/duplicate-data limitations, decision outcome explanations, transaction detail drill-through and currency precision. These latest changes remain subject to CI and browser acceptance; see the rebuild plan for exact acceptance criteria.
-
-
-Latest rebuild CI: 48 tests passed in run #105. This verifies automated tests and syntax, not real browser interactions or receipt/OCR automation. The product remains a synthetic prototype; see PRODUCT_SCOPE_AND_REBUILD_PLAN.md for the 53/100 assessment and remaining acceptance gates.
+See [SECURITY.md](SECURITY.md) before running outside a local demo environment. This repository is a portfolio prototype, **not a production-certified financial control platform**.
