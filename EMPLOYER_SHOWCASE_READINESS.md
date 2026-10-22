@@ -1,10 +1,16 @@
 # SpendLens — Employer Showcase Readiness Assessment
 
 **Assessment date:** 22 October 2026  
-**Current estimate: 73% complete**  
+**Withdrawn: prior 73% score was not a product-completion measure.**
+
+**Current product completion baseline: 24/100** (weighted against the intended automated expense-decision system; see [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md)).  
 **Scope:** Readiness to demonstrate the project credibly to an employer or technical interviewer. This is not a production-readiness or regulatory certification score.
 
-## What the percentage measures
+## What the former percentage measured
+
+The old score measured repository/demo completeness, not whether SpendLens met the intended requirement to decide expense approvals automatically. It must not be quoted as product completion. The old weighted scorecard below is retained only as a historical record and is superseded by the 24/100 product rubric in the rebuild plan.
+
+## What the former percentage measured
 
 The score estimates how much work is complete toward making SpendLens independently inspectable, installable, runnable, demonstrable and defensible in an interview. It is weighted by employer-facing requirements, not by phase count or code volume. Credit is awarded only where there is evidence.
 
@@ -79,7 +85,7 @@ A configuration file is not equivalent to a verified deployment; a workflow file
 
 SpendLens is an independent prototype using synthetic EUR transactions. Findings are human-review signals, not proof of fraud, policy violation, waste or supplier overcharging. Synthetic precision/recall must not be presented as expected real-world performance. The peer baseline currently uses in-sample peers and may include future-dated transactions. The project is not connected to Pleo, a bank or real employer data, and is not production-certified.
 
-**Current decision:** The full source and documentation are now present in GitHub, and hosted CI has passed for the source commit. SpendLens is close to being a credible employer demo, but manual fresh-clone/browser evidence, screenshots and Docker verification remain.
+**Current decision (22 October 2026):** The repository has a working synthetic-data foundation and API/dashboard scaffolding, but it does not implement the core automated expense-policy decision product. No claim/evidence domain model, versioned policy engine or deterministic approve/reject/review decision lifecycle exists. The prior 73% figure is withdrawn. Product completion starts at **24/100** under the new rubric. See [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md).
 
 ## Execution tracker — 22 October 2026
 
@@ -103,3 +109,12 @@ This tracker records the remaining work as open until the stated acceptance evid
 - The repository's latest recorded hosted CI run is green; the CI workflow covers dependency installation, automated tests, the synthetic pipeline, multi-seed validation and Python compilation.
 - The dashboard cross-filter/drill-through feature is implemented and its API tests pass, but manual browser behavior is still unverified. Docker runtime, historical-only backtesting and native PBIX creation have not been verified. Do not mark these complete based solely on configuration files or automated unit tests.
 - Update each row only after its acceptance evidence is committed or linked.
+
+
+## Product-scope reassessment — 22 October 2026
+
+The previous 73% estimate is withdrawn for product completion. It reflected repository completeness, CI and documentation, not the actual product requirement. Current evidence-based product baseline is **24/100**. The missing critical path is: first-class claim/evidence model, configurable versioned policy, deterministic rule engine, persisted decisions/audit lifecycle, API integration and a coherent state-driven dashboard.
+
+The existing anomaly detector and insight heuristics are supplementary risk signals. They do not decide whether an expense is eligible or reimbursable. The current findings/review workflow is not an automated approval workflow. The current frontend is a monolithic imperative script and has no claim/decision/policy workflow.
+
+The product acceptance criteria and rebuild sequence are now defined in [PRODUCT_SCOPE_AND_REBUILD_PLAN.md](PRODUCT_SCOPE_AND_REBUILD_PLAN.md). Do not describe the system as automatically approving or rejecting expenses until the Phase 2 engine and Phase 3 workflow exit gates pass.
