@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const state = {key:"", findings:[], transactions:[], decisions:[], claims:[], policies:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, claimPage:0, queuePage:0, queueTotal:0, queueItems:[], findingTotal:0, decisionTotal:0, claimTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
+  const state = {key:"", findings:[], transactions:[], decisions:[], claims:[], policies:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, claimPage:0, queuePage:0, queueTotal:0, queueItems:[], auditPage:0, auditTotal:0, auditItems:[], findingTotal:0, decisionTotal:0, claimTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
   const money = (n,currency="EUR") => {
     try{return new Intl.NumberFormat("en-IE",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n||0));}
     catch{return `${currency} ${Number(n||0).toFixed(2)}`;}
@@ -113,6 +113,20 @@
     $("finding-next").disabled=(state.findingPage+1)*state.listPageSize>=state.findingTotal;
     $("decision-prev").disabled=state.decisionPage===0;
     $("decision-next").disabled=(state.decisionPage+1)*state.listPageSize>=state.decisionTotal;
+  };
+  const loadAuditEvents = async () => {
+    const eventType=$("audit-event-filter").value;
+    const entityId=$("audit-entity-id").value.trim();
+    const qs=new URLSearchParams({limit:String(state.listPageSize),offset:String(state.auditPage*state.listPageSize)});
+    if(eventType)qs.set("event_type",eventType);
+    if(entityId)qs.set("entity_id",entityId);
+    const data=await api("/v1/audit-events?"+qs.toString());
+    state.auditItems=data.items||[];state.auditTotal=data.total||0;
+    $("audit-table").innerHTML=state.auditItems.map(e=>`<tr><td>${esc(new Date(e.created_at).toLocaleString())}</td><td><strong>${esc(e.event_type.replaceAll("_"," "))}</strong></td><td>${esc(e.entity_type)}<div class="finding-meta">${esc(e.entity_id)}</div></td><td>${esc(e.actor)}</td><td>${esc(JSON.stringify(e.details))}</td></tr>`).join("")||'<tr><td colspan="5" class="empty">No audit events match these filters.</td></tr>';
+    const start=state.auditTotal?state.auditPage*state.listPageSize+1:0;
+    $("audit-page-label").textContent=`Showing ${start}–${Math.min((state.auditPage+1)*state.listPageSize,state.auditTotal)} of ${number(state.auditTotal)}`;
+    $("audit-prev").disabled=state.auditPage===0;
+    $("audit-next").disabled=(state.auditPage+1)*state.listPageSize>=state.auditTotal;
   };
   const loadPolicies = async () => {
     const data=await api("/v1/policies");
@@ -280,16 +294,17 @@
   };
   const showSection = id => {
     state.currentSection=id;
-    ["overview","findings","transactions","decisions","claims","queue","policies"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
+    ["overview","findings","transactions","decisions","claims","queue","policies","audit"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
     document.querySelectorAll(".nav-item").forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+id));
     $("crumb-title").textContent=id[0].toUpperCase()+id.slice(1);
     if(id==="transactions")loadTransactions();
     if(id==="queue")loadExceptionQueue().catch(e=>toast(e.message));
     if(id==="policies")loadPolicies().catch(e=>toast(e.message));
+    if(id==="audit")loadAuditEvents().catch(e=>toast(e.message));
   };
   document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener("click",e=>{
     const id=a.getAttribute("href").slice(1);
-    if(["overview","findings","transactions","decisions","claims","policies"].includes(id)){e.preventDefault();showSection(id);}
+    if(["overview","findings","transactions","decisions","claims","policies","audit"].includes(id)){e.preventDefault();showSection(id);}
   }));
   $("transaction-count-card").addEventListener("click",()=>showSection("transactions"));
   $("transaction-count-card").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showSection("transactions");}});
@@ -354,6 +369,11 @@
   $("prev-page").addEventListener("click",()=>{if(state.page>0){state.page--;loadTransactions();}});
   $("next-page").addEventListener("click",()=>{if((state.page+1)*state.pageSize<state.total){state.page++;loadTransactions();}});
 
+  $("audit-refresh").addEventListener("click",()=>loadAuditEvents().catch(e=>toast(e.message)));
+  $("audit-apply").addEventListener("click",()=>{state.auditPage=0;loadAuditEvents().catch(e=>toast(e.message));});
+  $("audit-event-filter").addEventListener("change",()=>{state.auditPage=0;loadAuditEvents().catch(e=>toast(e.message));});
+  $("audit-prev").addEventListener("click",()=>{if(state.auditPage>0){state.auditPage--;loadAuditEvents().catch(e=>toast(e.message));}});
+  $("audit-next").addEventListener("click",()=>{if((state.auditPage+1)*state.listPageSize<state.auditTotal){state.auditPage++;loadAuditEvents().catch(e=>toast(e.message));}});
   $("queue-refresh").addEventListener("click",()=>loadExceptionQueue().catch(e=>toast(e.message)));
   ["queue-status","queue-priority","queue-overdue","queue-sort"].forEach(id=>$(id).addEventListener("change",()=>{state.queuePage=0;loadExceptionQueue().catch(e=>toast(e.message));}));
   let queueSearchTimer=null;
