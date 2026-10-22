@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
 from .decision_engine import evaluate_expense
 from .policy_store import init_policy_registry, create_policy_version, activate_policy_version, get_active_policy, list_policy_versions, get_policy_version
-from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate
+from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate, resolve_claim
 
 logger = logging.getLogger("spendlens.api")
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +30,19 @@ class ReviewUpdate(BaseModel):
     status: ReviewStatus
     reviewer: str = Field(min_length=2, max_length=100)
     note: str = Field(default="", max_length=2000)
+
+class ClaimResolutionRequest(BaseModel):
+    action: Literal["REQUEST_INFORMATION","APPROVE","REJECT"]
+    reviewer: str = Field(min_length=2,max_length=100)
+    reason: str = Field(min_length=3,max_length=2000)
+    evidence_note: str = Field(default="",max_length=4000)
+
+    @field_validator("reviewer","reason")
+    @classmethod
+    def required_text_not_blank(cls,value:str)->str:
+        if not value.strip():
+            raise ValueError("Field cannot be blank")
+        return value.strip()
 
     @field_validator("reviewer")
     @classmethod
@@ -289,6 +302,19 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         if item is None:
             raise HTTPException(404,"Expense claim not found")
         return item
+
+    @app.post("/v1/claims/{claim_id}/resolution")
+    def claim_resolution(claim_id:str,body:ClaimResolutionRequest,
+                         actor:str=Depends(require_role("analyst"))):
+        db()
+        try:
+            result=resolve_claim(db_path,claim_id,body.action,body.reviewer,
+                                 body.reason,body.evidence_note)
+            return result
+        except LookupError as exc:
+            raise HTTPException(404,str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(409,str(exc)) from exc
 
     @app.get("/v1/decisions")
     def decisions(outcome:Literal["APPROVE","REJECT","REVIEW","INSUFFICIENT_DATA"]|None=None,
