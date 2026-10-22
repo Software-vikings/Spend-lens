@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const state = {key:"", findings:[], transactions:[], decisions:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, findingTotal:0, decisionTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
+  const state = {key:"", findings:[], transactions:[], decisions:[], claims:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, claimPage:0, findingTotal:0, decisionTotal:0, claimTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
   const money = (n,currency="EUR") => {
     try{return new Intl.NumberFormat("en-IE",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n||0));}
     catch{return `${currency} ${Number(n||0).toFixed(2)}`;}
@@ -63,15 +63,15 @@
       const trendQuery=new URLSearchParams(Object.entries(state.filters).filter(([k,v])=>k!=="month"&&v));
       const departmentQuery=new URLSearchParams(Object.entries(state.filters).filter(([k,v])=>k!=="department"&&v));
       const categoryQuery=new URLSearchParams(Object.entries(state.filters).filter(([k,v])=>k!=="category"&&v));
-      const [summary,overview,trendData,departmentData,categoryData,findings,decisions]=await Promise.all([
+      const [summary,overview,trendData,departmentData,categoryData,findings,decisions,claims]=await Promise.all([
         api("/v1/summary"+suffix),api("/v1/analytics/overview"+suffix),
         api("/v1/analytics/overview"+(trendQuery.toString()?"?"+trendQuery:"")),
         api("/v1/analytics/overview"+(departmentQuery.toString()?"?"+departmentQuery:"")),
         api("/v1/analytics/overview"+(categoryQuery.toString()?"?"+categoryQuery:"")),
-        api(`/v1/findings?limit=${state.listPageSize}&offset=${state.findingPage*state.listPageSize}${$("finding-status").value?"&status="+encodeURIComponent($("finding-status").value):""}`),api(`/v1/decisions?limit=${state.listPageSize}&offset=${state.decisionPage*state.listPageSize}`)
+        api(`/v1/findings?limit=${state.listPageSize}&offset=${state.findingPage*state.listPageSize}${$("finding-status").value?"&status="+encodeURIComponent($("finding-status").value):""}`),api(`/v1/decisions?limit=${state.listPageSize}&offset=${state.decisionPage*state.listPageSize}`),api(`/v1/claims?limit=${state.listPageSize}&offset=${state.claimPage*state.listPageSize}${$("claim-status")?.value?"&status="+encodeURIComponent($("claim-status").value):""}`)
       ]);
-      state.overview=overview;state.findings=findings.items||[];state.findingTotal=findings.total||0;state.decisions=decisions.items||[];state.decisionTotal=decisions.total||0;
-      $("decision-count").textContent=number(decisions.total||0);renderDecisions();updateListPagination();
+      state.overview=overview;state.findings=findings.items||[];state.findingTotal=findings.total||0;state.decisions=decisions.items||[];state.decisionTotal=decisions.total||0;state.claims=claims.items||[];state.claimTotal=claims.total||0;
+      $("decision-count").textContent=number(decisions.total||0);$("claim-count").textContent=number(claims.total||0);renderDecisions();renderClaims();updateListPagination();updateClaimPagination();
       $("total-spend").textContent=money(summary.total_spend);
       $("transaction-count").textContent=number(summary.transaction_count);
       const open=Object.entries(summary.findings_by_status||{}).filter(([k])=>["new","under_review"].includes(k)).reduce((a,[,v])=>a+v,0);
@@ -113,6 +113,30 @@
     $("finding-next").disabled=(state.findingPage+1)*state.listPageSize>=state.findingTotal;
     $("decision-prev").disabled=state.decisionPage===0;
     $("decision-next").disabled=(state.decisionPage+1)*state.listPageSize>=state.decisionTotal;
+  };
+  const updateClaimPagination = () => {
+    const start=state.claimTotal?state.claimPage*state.listPageSize+1:0;
+    $("claim-page-label").textContent=`Showing ${start}–${Math.min((state.claimPage+1)*state.listPageSize,state.claimTotal)} of ${number(state.claimTotal)}`;
+    $("claim-prev").disabled=state.claimPage===0;
+    $("claim-next").disabled=(state.claimPage+1)*state.listPageSize>=state.claimTotal;
+  };
+  const loadClaimPage = async () => {
+    const qs=new URLSearchParams({limit:state.listPageSize,offset:state.claimPage*state.listPageSize});
+    const status=$("claim-status").value;if(status)qs.set("status",status);
+    const data=await api("/v1/claims?"+qs.toString());
+    state.claims=data.items||[];state.claimTotal=data.total||0;
+    $("claim-count").textContent=number(state.claimTotal);renderClaims();updateClaimPagination();
+  };
+  const renderClaims = () => {
+    $("claims-table").innerHTML=state.claims.map(claim=>`<tr><td><strong>${esc(claim.claim_id)}</strong><div class="finding-meta">${esc(claim.latest_decision_id||"")}</div></td><td>${esc(claim.employee_id||"—")}</td><td>${esc(claim.merchant_name||"—")}</td><td>${esc(claim.department||"—")}</td><td>${money(claim.amount,claim.currency||"EUR")}</td><td><span class="decision-outcome ${esc((claim.current_status||"").toLowerCase())}">${esc((claim.current_status||"").replaceAll("_"," "))}</span></td><td>${esc(new Date(claim.updated_at).toLocaleString())}</td><td><button class="secondary-btn small" data-claim-id="${esc(claim.claim_id)}">Open →</button></td></tr>`).join("")||'<tr><td colspan="8" class="empty">No claims match this filter</td></tr>';
+  };
+  const openClaim = async id => {
+    try{
+      const claim=await api(`/v1/claims/${encodeURIComponent(id)}`);
+      $("finding-detail").innerHTML=`<div class="eyebrow">EXPENSE CLAIM</div><h2>${esc(claim.merchant_name||"Claim")}</h2><div class="detail-type">${esc(claim.claim_id)}</div><div class="detail-amount">${money(claim.amount,claim.currency||"EUR")}</div><div class="detail-section"><h3>Current claim details</h3><div class="detail-grid">${Object.entries(claim.current_payload||{}).filter(([k])=>k!=="receipt").map(([k,v])=>`<div class="detail-field"><small>${esc(k.replaceAll("_"," "))}</small><b>${esc(typeof v==="object"?JSON.stringify(v):v)}</b></div>`).join("")}</div></div><div class="detail-section"><h3>Submission and decision history</h3>${claim.submissions.map(s=>`<div class="finding-line"><div><b>${esc(new Date(s.submitted_at).toLocaleString())}</b><div class="finding-meta">${esc(s.submission_id)}</div></div><button class="secondary-btn small" data-claim-decision="${esc(s.decision_id)}">Decision →</button></div>`).join("")}</div><div class="detail-section"><h3>Receipt evidence metadata</h3>${claim.evidence.map(e=>`<div class="finding-line"><div><b>${esc(e.evidence_type)} · ${esc(e.evidence_status)}</b><div class="finding-meta">Reference: ${esc(e.evidence_ref||"Not supplied")} · Source: ${esc(e.source)}</div></div></div>`).join("")||'<div class="finding-meta">No receipt metadata recorded.</div>'}<p class="field-note">Metadata only. No receipt file is stored or verified.</p></div>`;
+      $("drawer-backdrop").classList.remove("hidden");
+      $("finding-detail").querySelectorAll("[data-claim-decision]").forEach(el=>el.addEventListener("click",async()=>{ $("drawer-backdrop").classList.add("hidden");await showDecision(el.dataset.claimDecision);showSection("decisions");}));
+    }catch(e){toast(e.message);}
   };
   const loadFindingPage = async () => {
     const status=$("finding-status").value;
@@ -205,20 +229,26 @@
   };
   const showSection = id => {
     state.currentSection=id;
-    ["overview","findings","transactions","decisions"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
+    ["overview","findings","transactions","decisions","claims"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
     document.querySelectorAll(".nav-item").forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+id));
     $("crumb-title").textContent=id[0].toUpperCase()+id.slice(1);
     if(id==="transactions")loadTransactions();
   };
   document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener("click",e=>{
     const id=a.getAttribute("href").slice(1);
-    if(["overview","findings","transactions","decisions"].includes(id)){e.preventDefault();showSection(id);}
+    if(["overview","findings","transactions","decisions","claims"].includes(id)){e.preventDefault();showSection(id);}
   }));
   $("transaction-count-card").addEventListener("click",()=>showSection("transactions"));
   $("transaction-count-card").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showSection("transactions");}});
   $("view-filtered-transactions").addEventListener("click",()=>showSection("transactions"));
   $("clear-filters").addEventListener("click",async()=>{state.filters={month:"",department:"",category:""};state.page=0;await refreshAll();});
   $("decisions-table").addEventListener("click",e=>{const b=e.target.closest("[data-decision-id]");if(b)showDecision(b.dataset.decisionId);});
+  $("claims-table").addEventListener("click",e=>{const b=e.target.closest("[data-claim-id]");if(b)openClaim(b.dataset.claimId);});
+  $("claims-refresh").addEventListener("click",async()=>{try{state.claimPage=0;await loadClaimPage();}catch(e){toast(e.message);}});
+  $("claim-status").addEventListener("change",async()=>{try{state.claimPage=0;await loadClaimPage();}catch(e){toast(e.message);}});
+  $("claim-prev").addEventListener("click",async()=>{if(state.claimPage>0){state.claimPage--;try{await loadClaimPage();}catch(e){toast(e.message);}}});
+  $("claim-next").addEventListener("click",async()=>{if((state.claimPage+1)*state.listPageSize<state.claimTotal){state.claimPage++;try{await loadClaimPage();}catch(e){toast(e.message);}}});
+
   $("decisions-refresh").addEventListener("click",async()=>{try{state.decisionPage=0;await loadDecisionPage();}catch(e){toast(e.message);}});
   let pendingIdempotencyKey=null;
   $("expense-evaluation-form").addEventListener("submit",async e=>{
