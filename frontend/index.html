@@ -17,10 +17,11 @@
     <main class="main">
       <header class="topbar"><div class="crumb">Workspace <span>/</span> <b id="crumb-title">Overview</b></div><div class="top-actions"><span class="demo-pill">SYNTHETIC DATA</span><button class="icon-btn" id="refresh-btn" title="Refresh data">↻</button><div class="avatar">SA</div></div></header>
       <section class="page" id="overview">
-        <div class="page-heading"><div><div class="eyebrow">MONDAY, FINANCIAL INTELLIGENCE</div><h1>Spend overview</h1><p>A clear view of where company money goes — and what deserves a closer look.</p></div><div class="period-tag">All available data <span>⌄</span></div></div>
+        <div class="page-heading"><div><div class="eyebrow">FINANCIAL INTELLIGENCE</div><h1>Spend overview</h1><p>Select a month, department or category to cross-filter the dashboard and transaction ledger.</p></div></div>
+        <div class="dashboard-filterbar"><span id="filter-summary" aria-live="polite">Showing all available transaction data</span><div><button class="secondary-btn small" id="clear-filters" disabled>Clear filters</button><button class="primary-btn compact-btn" id="view-filtered-transactions">View filtered transactions →</button></div></div>
         <div class="metrics">
           <article class="metric"><div class="metric-top"><span>Total spend</span><span class="metric-icon">€</span></div><strong id="total-spend">—</strong><small>Across recorded transactions</small></article>
-          <article class="metric"><div class="metric-top"><span>Transactions</span><span class="metric-icon">↗</span></div><strong id="transaction-count">—</strong><small>Processed records</small></article>
+          <article class="metric clickable-metric" id="transaction-count-card" role="button" tabindex="0" aria-label="Open filtered transactions"><div class="metric-top"><span>Transactions <small class="metric-hint">Open ledger ↗</small></span><span class="metric-icon">↗</span></div><strong id="transaction-count">—</strong><small>Click to inspect matching records</small></article>
           <article class="metric"><div class="metric-top"><span>Open findings</span><span class="metric-icon amber">◎</span></div><strong id="open-findings">—</strong><small>Awaiting analyst action</small></article>
           <article class="metric"><div class="metric-top"><span>Finding types</span><span class="metric-icon">⌘</span></div><strong id="finding-types">—</strong><small>Distinct signal categories</small></article>
         </div>
@@ -39,8 +40,8 @@
         <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Finding</th><th>Merchant / signal</th><th>Amount</th><th>Occurrences</th><th>Status</th><th></th></tr></thead><tbody id="findings-table"><tr><td colspan="6" class="empty">Connect to load findings</td></tr></tbody></table></div></div>
       </section>
       <section class="page hidden" id="transactions">
-        <div class="page-heading"><div><div class="eyebrow">LEDGER EXPLORER</div><h1>Transactions</h1><p>Explore the underlying synthetic transaction records.</p></div></div>
-        <div class="toolbar"><input id="transaction-search" placeholder="Search merchant, employee or transaction ID"><select id="transaction-department"><option value="">All departments</option></select><select id="transaction-category"><option value="">All categories</option></select><button class="secondary-btn" id="transactions-refresh">Refresh</button></div>
+        <div class="page-heading"><div><div class="eyebrow">LEDGER EXPLORER</div><h1>Transactions</h1><p>Explore the underlying synthetic records. Selections here also filter the overview dashboard.</p></div></div>
+        <div class="toolbar"><input id="transaction-search" placeholder="Search merchant, employee or transaction ID"><select id="transaction-month"><option value="">All months</option></select><select id="transaction-department"><option value="">All departments</option></select><select id="transaction-category"><option value="">All categories</option></select><button class="secondary-btn" id="transactions-refresh">Refresh</button></div>
         <div class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Merchant</th><th>Department</th><th>Category</th><th>Employee</th><th class="right">Amount</th></tr></thead><tbody id="transactions-table"><tr><td colspan="6" class="empty">Connect to load transactions</td></tr></tbody></table></div><div class="pagination"><span id="transaction-page-label">—</span><div><button class="secondary-btn small" id="prev-page">Previous</button><button class="secondary-btn small" id="next-page">Next</button></div></div></div>
       </section>
       <footer>SpendLens <span>•</span> Synthetic demonstration environment <span class="footer-right">A flag is a review signal, not a verdict.</span></footer>
