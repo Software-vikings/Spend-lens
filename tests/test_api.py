@@ -315,3 +315,37 @@ def test_claim_register_is_paginated_and_filterable(tmp_path):
     assert len(page.json()["items"]) == 2
     assert client.get("/v1/claims?status=APPROVE",headers={"X-API-Key":VIEWER}).json()["total"] == 3
     assert client.get("/v1/claims").status_code == 401
+
+
+def test_policy_versions_are_immutable_admin_managed_and_used_by_evaluator(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    viewer={"X-API-Key":VIEWER};admin={"X-API-Key":ADMIN}
+    initial=client.get("/v1/policies",headers=viewer)
+    assert initial.status_code==200
+    active=next(x for x in initial.json()["items"] if x["is_active"])
+    original=client.get(f"/v1/policies/{active['policy_id']}/{active['version']}",headers=viewer).json()
+    revised=dict(original,version="1.0.1",name="Synthetic demonstration policy revised")
+    created=client.post("/v1/policies",headers=admin,json=revised)
+    assert created.status_code==201
+    assert client.post("/v1/policies",headers=admin,json=revised).status_code==409
+    assert client.post("/v1/policies",headers=viewer,json=dict(revised,version="1.0.2")).status_code==403
+    invalid=dict(revised,version="1.0.2",blocked_categories=revised["eligible_categories"])
+    assert client.post("/v1/policies",headers=admin,json=invalid).status_code==422
+    activated=client.post(f"/v1/policies/{active['policy_id']}/1.0.1/activate",headers=admin)
+    assert activated.status_code==200
+    listed=client.get("/v1/policies",headers=viewer).json()["items"]
+    assert next(x for x in listed if x["version"]=="1.0.1")["is_active"]
+    expense={"expense_id":"POLICY-VERSION-001","employee_id":"EMP-POL","merchant_name":"City Cafe",
+      "department":"Sales","amount":"85.00","currency":"EUR","category":"Meals",
+      "transaction_date":"2026-05-14","business_purpose":"Client meeting",
+      "receipt":{"provided":True,"readable":True,"receipt_id":"R-POL-1","total":"85.00"}}
+    decision=client.post("/v1/expenses/evaluate",headers={"X-API-Key":ANALYST},json={"expense":expense})
+    assert decision.status_code==200
+    assert decision.json()["policy_version"]=="1.0.1"
+    assert decision.json()["policy_id"]==active["policy_id"]
+
+
+def test_policy_activation_requires_admin_and_unknown_version_is_404(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    assert client.post("/v1/policies/UNKNOWN/9.9/activate",headers={"X-API-Key":ANALYST}).status_code==403
+    assert client.post("/v1/policies/UNKNOWN/9.9/activate",headers={"X-API-Key":ADMIN}).status_code==404
