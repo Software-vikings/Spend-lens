@@ -104,7 +104,8 @@ def test_dashboard_and_assets_are_served(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
     page=client.get("/")
     assert page.status_code==200
-    assert "Upload your transaction file" in page.text\n    assert "SYNTHETIC DATA" not in page.text
+    assert "Upload your transaction file" in page.text
+    assert "SYNTHETIC DATA" not in page.text
     assert client.get("/assets/app.js").status_code==200
 
 def test_transaction_search_is_server_side_and_paged(tmp_path):
