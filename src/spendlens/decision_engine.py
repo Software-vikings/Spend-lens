@@ -70,7 +70,7 @@ def evaluate_expense(expense: dict, policy: dict) -> dict:
     needs_review = False
     insufficient = False
 
-    required_fields = ("expense_id", "amount", "currency", "category", "transaction_date")
+    required_fields = ("expense_id", "employee_id", "merchant_name", "department", "amount", "currency", "category", "transaction_date")
     missing = [field for field in required_fields if expense.get(field) in (None, "")]
     amount = _amount(expense.get("amount"))
     if amount is None and "amount" not in missing:
