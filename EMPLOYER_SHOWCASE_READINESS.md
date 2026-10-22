@@ -43,11 +43,11 @@ Runtime SQLite database, local caches, credentials and generated transaction/exp
 - Latest recorded local automated test result: **30 passed**.
 - Python source/test compilation passed.
 - Dashboard JavaScript syntax check passed.
-- GitHub Actions source commit **218ebf8** completed successfully. Steps verified: checkout, Python setup, dependency installation, pytest, synthetic pipeline, multi-seed validation and Python compilation.
+- GitHub Actions source commit **2900258** completed successfully, including the dashboard CSP correction and optimised cohort scoring. Steps verified: checkout, Python setup, dependency installation, pytest, synthetic pipeline, multi-seed validation and Python compilation.
 - GitHub tree inspection confirmed the 34 tracked paths listed above.
-- The latest main commit includes the complete app modules, dashboard, tests, CI, SQL, Docker configuration, Power BI guide and updated documentation.
+- The latest source commit includes the complete app modules, dashboard, tests, CI, SQL, Docker configuration, Power BI guide and updated documentation.
 
-The successful hosted workflow verifies a clean GitHub checkout can install and execute the automated checks. It does not replace a manual browser walkthrough or Docker runtime test.
+The successful hosted workflow verifies a clean GitHub checkout can install and execute the automated checks. The detector now computes cohort statistics once per group, reducing the local full validation run to about 1.7 seconds; the cohort includes the focal row, so this remains an in-sample screen rather than a historical-only backtest. The CSP now permits same-origin dashboard assets while retaining restrictive defaults. Hosted CI does not replace a manual browser walkthrough or Docker runtime test.
 
 ## Remaining work and acceptance criteria
 
