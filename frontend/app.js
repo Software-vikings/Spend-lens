@@ -184,8 +184,8 @@
   };
   const loadExceptionQueue = async () => {
     const qs=new URLSearchParams({limit:state.listPageSize,offset:state.queuePage*state.listPageSize});
-    const status=$("queue-status").value,assignee=$("queue-assignee").value.trim(),priority=$("queue-priority").value,overdue=$("queue-overdue").value;
-    if(status)qs.set("status",status);if(assignee)qs.set("assignee",assignee);if(priority)qs.set("priority",priority);if(overdue!=="")qs.set("overdue",overdue);
+    const status=$("queue-status").value,assignee=$("queue-assignee").value.trim(),priority=$("queue-priority").value,overdue=$("queue-overdue").value,sort=$("queue-sort").value;
+    if(status)qs.set("status",status);if(assignee)qs.set("assignee",assignee);if(priority)qs.set("priority",priority);if(overdue!=="")qs.set("overdue",overdue);qs.set("sort",sort);
     const data=await api("/v1/exception-queue?"+qs.toString());
     state.queueItems=data.items||[];state.queueTotal=data.total||0;state.queueMetrics=data.metrics||{assigned:0,unassigned:state.queueTotal,overdue:0};renderExceptionQueue();
   };
