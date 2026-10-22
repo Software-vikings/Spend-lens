@@ -38,7 +38,7 @@
     if(state.filters.month)labels.push(`Month: ${state.filters.month}`);
     if(state.filters.department)labels.push(`Department: ${state.filters.department}`);
     if(state.filters.category)labels.push(`Category: ${state.filters.category}`);
-    $("filter-summary").textContent=labels.length?`Filtered by ${labels.join(" · ")}`:"Showing all available transaction data";
+    $("filter-summary").textContent=labels.length?`Filtered by ${labels.join(" · ")} · Findings remain workspace-wide`:"Showing all available transaction data";
     $("clear-filters").disabled=!labels.length;
     $("transaction-month").value=state.filters.month;
     $("transaction-department").value=state.filters.department;
