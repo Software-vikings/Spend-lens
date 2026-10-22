@@ -1,6 +1,6 @@
 (() => {
   const $ = id => document.getElementById(id);
-  const state = {key:"", findings:[], transactions:[], decisions:[], claims:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, claimPage:0, findingTotal:0, decisionTotal:0, claimTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
+  const state = {key:"", findings:[], transactions:[], decisions:[], claims:[], policies:[], page:0, pageSize:25, total:0, findingPage:0, decisionPage:0, claimPage:0, findingTotal:0, decisionTotal:0, claimTotal:0, listPageSize:25, selected:null, overview:null, filters:{month:"",department:"",category:""}, filterOptions:null, currentSection:"overview"};
   const money = (n,currency="EUR") => {
     try{return new Intl.NumberFormat("en-IE",{style:"currency",currency,minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(n||0));}
     catch{return `${currency} ${Number(n||0).toFixed(2)}`;}
@@ -113,6 +113,16 @@
     $("finding-next").disabled=(state.findingPage+1)*state.listPageSize>=state.findingTotal;
     $("decision-prev").disabled=state.decisionPage===0;
     $("decision-next").disabled=(state.decisionPage+1)*state.listPageSize>=state.decisionTotal;
+  };
+  const loadPolicies = async () => {
+    const data=await api("/v1/policies");
+    state.policies=data.items||[];
+    $("policies-table").innerHTML=state.policies.map(p=>`<tr><td><strong>${esc(p.name)}</strong><div class="finding-meta">${esc(p.policy_id)}</div></td><td>${esc(p.version)}</td><td>${esc(new Date(p.created_at).toLocaleString())}</td><td>${esc(p.activated_at?new Date(p.activated_at).toLocaleString():"—")}</td><td><span class="status ${p.is_active?"confirmed":"new"}">${p.is_active?"ACTIVE":"INACTIVE"}</span></td><td><button class="secondary-btn small" data-policy-load="${esc(p.policy_id)}|${esc(p.version)}">Load</button> ${p.is_active?"":`<button class="secondary-btn small" data-policy-activate="${esc(p.policy_id)}|${esc(p.version)}">Activate</button>`}</td></tr>`).join("")||'<tr><td colspan="6" class="empty">No policy versions found</td></tr>';
+  };
+  const loadPolicyEditor = async (policyId,version) => {
+    const policy=await api(`/v1/policies/${encodeURIComponent(policyId)}/${encodeURIComponent(version)}`);
+    $("policy-editor").value=JSON.stringify(policy,null,2);
+    $("policy-editor-status").textContent=`Loaded ${policyId} version ${version}. Change the version field before saving.`;
   };
   const updateClaimPagination = () => {
     const start=state.claimTotal?state.claimPage*state.listPageSize+1:0;
@@ -229,14 +239,14 @@
   };
   const showSection = id => {
     state.currentSection=id;
-    ["overview","findings","transactions","decisions","claims"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
+    ["overview","findings","transactions","decisions","claims","policies"].forEach(x=>$(x).classList.toggle("hidden",x!==id));
     document.querySelectorAll(".nav-item").forEach(a=>a.classList.toggle("active",a.getAttribute("href")==="#"+id));
     $("crumb-title").textContent=id[0].toUpperCase()+id.slice(1);
-    if(id==="transactions")loadTransactions();
+    if(id==="transactions")loadTransactions();\n    if(id==="policies")loadPolicies().catch(e=>toast(e.message));
   };
   document.querySelectorAll('a[href^="#"]').forEach(a=>a.addEventListener("click",e=>{
     const id=a.getAttribute("href").slice(1);
-    if(["overview","findings","transactions","decisions","claims"].includes(id)){e.preventDefault();showSection(id);}
+    if(["overview","findings","transactions","decisions","claims","policies"].includes(id)){e.preventDefault();showSection(id);}
   }));
   $("transaction-count-card").addEventListener("click",()=>showSection("transactions"));
   $("transaction-count-card").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();showSection("transactions");}});
@@ -244,6 +254,24 @@
   $("clear-filters").addEventListener("click",async()=>{state.filters={month:"",department:"",category:""};state.page=0;await refreshAll();});
   $("decisions-table").addEventListener("click",e=>{const b=e.target.closest("[data-decision-id]");if(b)showDecision(b.dataset.decisionId);});
   $("claims-table").addEventListener("click",e=>{const b=e.target.closest("[data-claim-id]");if(b)openClaim(b.dataset.claimId);});
+  $("policies-refresh").addEventListener("click",()=>loadPolicies().catch(e=>toast(e.message)));
+  $("policies-table").addEventListener("click",async e=>{
+    const load=e.target.closest("[data-policy-load]");
+    const activate=e.target.closest("[data-policy-activate]");
+    try{
+      if(load){const [id,version]=load.dataset.policyLoad.split("|");await loadPolicyEditor(id,version);}
+      if(activate){const [id,version]=activate.dataset.policyActivate.split("|");await api(`/v1/policies/${encodeURIComponent(id)}/${encodeURIComponent(version)}/activate`,{method:"POST"});toast("Policy version activated for future evaluations.");await loadPolicies();}
+    }catch(err){toast(err.message);}
+  });
+  $("policy-save").addEventListener("click",async()=>{
+    try{
+      const policy=JSON.parse($("policy-editor").value);
+      const result=await api("/v1/policies",{method:"POST",body:JSON.stringify(policy)});
+      $("policy-editor-status").textContent=`Saved immutable version ${result.policy_id} ${result.version}. Activate it separately when authorised.`;
+      toast("New policy version saved.");await loadPolicies();
+    }catch(err){$("policy-editor-status").textContent=err.message;toast(err.message);}
+  });
+
   $("claims-refresh").addEventListener("click",async()=>{try{state.claimPage=0;await loadClaimPage();}catch(e){toast(e.message);}});
   $("claim-status").addEventListener("change",async()=>{try{state.claimPage=0;await loadClaimPage();}catch(e){toast(e.message);}});
   $("claim-prev").addEventListener("click",async()=>{if(state.claimPage>0){state.claimPage--;try{await loadClaimPage();}catch(e){toast(e.message);}}});
