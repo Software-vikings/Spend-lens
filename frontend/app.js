@@ -355,7 +355,7 @@
   $("next-page").addEventListener("click",()=>{if((state.page+1)*state.pageSize<state.total){state.page++;loadTransactions();}});
 
   $("queue-refresh").addEventListener("click",()=>loadExceptionQueue().catch(e=>toast(e.message)));
-  ["queue-status","queue-priority","queue-overdue"].forEach(id=>$(id).addEventListener("change",()=>{state.queuePage=0;loadExceptionQueue().catch(e=>toast(e.message));}));
+  ["queue-status","queue-priority","queue-overdue","queue-sort"].forEach(id=>$(id).addEventListener("change",()=>{state.queuePage=0;loadExceptionQueue().catch(e=>toast(e.message));}));
   let queueSearchTimer=null;
   $("queue-assignee").addEventListener("input",()=>{clearTimeout(queueSearchTimer);queueSearchTimer=setTimeout(()=>{state.queuePage=0;loadExceptionQueue().catch(e=>toast(e.message));},300);});
   $("queue-prev").addEventListener("click",()=>{if(state.queuePage>0){state.queuePage--;loadExceptionQueue().catch(e=>toast(e.message));}});
