@@ -250,3 +250,50 @@ def test_transaction_detail_returns_only_exactly_linked_findings(tmp_path):
     assert len(payload["related_findings"]) == 1
     assert payload["related_findings"][0]["finding_type"] == "anomaly"
     assert client.get("/v1/transactions/DOES-NOT-EXIST",headers=headers).status_code == 404
+
+
+def test_expense_claim_persists_submission_decision_and_receipt_metadata(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":ANALYST}
+    expense={"expense_id":"CLAIM-001","employee_id":"EMP-501","merchant_name":"Rail Services",
+      "department":"Operations","amount":"72.50","currency":"EUR","category":"Travel",
+      "transaction_date":"2026-05-18","business_purpose":"Client site visit",
+      "receipt":{"provided":True,"readable":True,"receipt_id":"RECEIPT-501","total":"72.50"}}
+    submitted=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":expense})
+    assert submitted.status_code == 200
+    decision=submitted.json()
+    claim=client.get("/v1/claims/CLAIM-001",headers={"X-API-Key":VIEWER})
+    assert claim.status_code == 200
+    payload=claim.json()
+    assert payload["claim_id"] == "CLAIM-001"
+    assert payload["current_status"] == decision["outcome"]
+    assert payload["latest_decision_id"] == decision["decision_id"]
+    assert len(payload["submissions"]) == 1
+    assert payload["submissions"][0]["decision_id"] == decision["decision_id"]
+    assert len(payload["evidence"]) == 1
+    assert payload["evidence"][0]["evidence_type"] == "RECEIPT"
+    assert payload["evidence"][0]["evidence_ref"] == "RECEIPT-501"
+    assert payload["evidence"][0]["evidence_status"] == "METADATA_SUBMITTED"
+    assert payload["evidence"][0]["source"] == "SUBMITTED_METADATA"
+    assert client.get("/v1/claims/CLAIM-001").status_code == 401
+    assert client.get("/v1/claims/UNKNOWN",headers={"X-API-Key":VIEWER}).status_code == 404
+
+
+def test_claim_resubmission_preserves_prior_decision_history(tmp_path):
+    db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
+    headers={"X-API-Key":ANALYST}
+    expense={"expense_id":"CLAIM-HISTORY-001","employee_id":"EMP-502","merchant_name":"Rail Services",
+      "department":"Operations","amount":"72.50","currency":"EUR","category":"Travel",
+      "transaction_date":"2026-05-18","business_purpose":"Client site visit",
+      "receipt":{"provided":True,"readable":True,"receipt_id":"RECEIPT-502","total":"72.50"}}
+    first=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":expense})
+    revised=dict(expense,amount="75.00",receipt=dict(expense["receipt"],receipt_id="RECEIPT-503",total="75.00"))
+    second=client.post("/v1/expenses/evaluate",headers=headers,json={"expense":revised})
+    assert first.status_code == second.status_code == 200
+    assert first.json()["decision_id"] != second.json()["decision_id"]
+    claim=client.get("/v1/claims/CLAIM-HISTORY-001",headers={"X-API-Key":VIEWER}).json()
+    assert len(claim["submissions"]) == 2
+    assert len({item["decision_id"] for item in claim["submissions"]}) == 2
+    assert claim["latest_decision_id"] == second.json()["decision_id"]
+    assert claim["amount"] == "75.00"
+    assert len(claim["evidence"]) == 2
