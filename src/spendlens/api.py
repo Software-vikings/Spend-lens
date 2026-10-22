@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
 from .decision_engine import evaluate_expense
 from .policy_store import init_policy_registry, create_policy_version, activate_policy_version, get_active_policy, list_policy_versions, get_policy_version
-from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate, resolve_claim, assign_claim, list_exception_queue
+from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate, resolve_claim, assign_claim, list_exception_queue, record_audit_event, list_audit_events
 
 logger = logging.getLogger("spendlens.api")
 ROOT = Path(__file__).resolve().parents[2]
@@ -266,7 +266,12 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         init_decisions(db_path)
         seed_path=ROOT/"policies"/"demo_policy.json"
         init_policy_registry(db_path,json.loads(seed_path.read_text()) if seed_path.exists() else None)
-        try: return create_policy_version(db_path,body,actor)
+        try:
+            result = create_policy_version(db_path,body,actor)
+            record_audit_event(db_path,"POLICY_CREATED","policy",
+                f"{result.get('policy_id')}:{result.get('version')}",actor,
+                {"policy_id":result.get("policy_id"),"version":result.get("version")})
+            return result
         except ValueError as exc: raise HTTPException(409 if "already exists" in str(exc) else 422,str(exc)) from exc
 
     @app.post("/v1/policies/{policy_id}/{version}/activate")
@@ -274,7 +279,11 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         init_decisions(db_path)
         seed_path=ROOT/"policies"/"demo_policy.json"
         init_policy_registry(db_path,json.loads(seed_path.read_text()) if seed_path.exists() else None)
-        try: return activate_policy_version(db_path,policy_id,version,actor)
+        try:
+            result = activate_policy_version(db_path,policy_id,version,actor)
+            record_audit_event(db_path,"POLICY_ACTIVATED","policy",
+                f"{policy_id}:{version}",actor,{"policy_id":policy_id,"version":version})
+            return result
         except LookupError as exc: raise HTTPException(404,str(exc)) from exc
 
     @app.post("/v1/expenses/evaluate")
@@ -334,8 +343,11 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
                          actor: str = Depends(require_role("analyst"))):
         db()
         try:
-            return assign_claim(db_path, claim_id, body.assignee, body.assigned_by,
-                                body.priority, body.sla_hours, body.note)
+            result = assign_claim(db_path, claim_id, body.assignee, body.assigned_by,
+                                  body.priority, body.sla_hours, body.note)
+            record_audit_event(db_path,"CLAIM_ASSIGNED","claim",claim_id,actor,
+                {"assignee":body.assignee,"priority":body.priority,"sla_hours":body.sla_hours})
+            return result
         except LookupError as exc:
             raise HTTPException(404, str(exc)) from exc
         except ValueError as exc:
@@ -348,11 +360,23 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         try:
             result=resolve_claim(db_path,claim_id,body.action,body.reviewer,
                                  body.reason,body.evidence_note)
+            record_audit_event(db_path,"CLAIM_RESOLVED","claim",claim_id,actor,
+                {"action":body.action,"resolution_status":result["resolution_status"],
+                 "reviewer":body.reviewer,"reason":body.reason})
             return result
         except LookupError as exc:
             raise HTTPException(404,str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(409,str(exc)) from exc
+
+    @app.get("/v1/audit-events")
+    def audit_events(entity_type: str | None = None, entity_id: str | None = None,
+                     event_type: str | None = None,
+                     limit: int = Query(100, ge=1, le=500),
+                     offset: int = Query(0, ge=0),
+                     _: str = Depends(require_role("admin"))):
+        db()
+        return list_audit_events(db_path, entity_type, entity_id, event_type, limit, offset)
 
     @app.get("/v1/decisions")
     def decisions(outcome:Literal["APPROVE","REJECT","REVIEW","INSUFFICIENT_DATA"]|None=None,
