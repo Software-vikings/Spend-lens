@@ -52,6 +52,8 @@ def find_potential_duplicate(db_path: str | Path, expense: dict) -> dict | None:
             "ORDER BY created_at DESC LIMIT 500"
         ).fetchall()
     for row in rows:
+        if row["expense_id"] == str(expense.get("expense_id", "")):
+            continue
         try:
             prior = json.loads(row["expense_payload"])
         except (TypeError, json.JSONDecodeError):
