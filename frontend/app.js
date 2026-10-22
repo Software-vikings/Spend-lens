@@ -68,7 +68,7 @@
         api("/v1/analytics/overview"+(trendQuery.toString()?"?"+trendQuery:"")),
         api("/v1/analytics/overview"+(departmentQuery.toString()?"?"+departmentQuery:"")),
         api("/v1/analytics/overview"+(categoryQuery.toString()?"?"+categoryQuery:"")),
-        api(`/v1/findings?limit=${state.listPageSize}&offset=${state.findingPage*state.listPageSize}`),api(`/v1/decisions?limit=${state.listPageSize}&offset=${state.decisionPage*state.listPageSize}`)
+        api(`/v1/findings?limit=${state.listPageSize}&offset=${state.findingPage*state.listPageSize}${$("finding-status").value?"&status="+encodeURIComponent($("finding-status").value):""}`),api(`/v1/decisions?limit=${state.listPageSize}&offset=${state.decisionPage*state.listPageSize}`)
       ]);
       state.overview=overview;state.findings=findings.items||[];state.findingTotal=findings.total||0;state.decisions=decisions.items||[];state.decisionTotal=decisions.total||0;
       $("decision-count").textContent=number(decisions.total||0);renderDecisions();updateListPagination();
@@ -77,7 +77,7 @@
       const open=Object.entries(summary.findings_by_status||{}).filter(([k])=>["new","under_review"].includes(k)).reduce((a,[,v])=>a+v,0);
       $("open-findings").textContent=number(open);
       $("finding-types").textContent=number(Object.keys(summary.findings_by_type||{}).length);
-      $("nav-count").textContent=number(state.findings.length);
+      $("nav-count").textContent=number(state.findingTotal);
       renderTrend(trendData.monthly||[]);renderDepartments(departmentData.departments||[]);renderCategories(categoryData.categories||[]);renderLatest();
       renderFindings();renderFilterState();await loadTransactions();
     } catch(e){toast(e.message);if(/key|auth|credential/i.test(e.message)){ $("connect-overlay").classList.remove("hidden");$("connection-label").textContent="Disconnected";$("connection-dot").classList.add("red");}}
