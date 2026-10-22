@@ -500,10 +500,10 @@ def test_upload_endpoint_analyzes_csv_without_api_key_and_does_not_persist(tmp_p
         before=conn.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
     client=TestClient(create_app(db,api_keys=KEYS))
     content=(
-      "Transaction Date,Merchant,Amount,Currency,Employee ID,Category,Transaction ID,Department\\n"
-      "2026-10-01,Metro Hotel,145.00,INR,EMP-1,Travel,T-100,Finance\\n"
-      "2026-10-01,Metro Hotel,145.00,INR,EMP-1,Travel,T-101,Finance\\n"
-      "2026-10-02,City Cafe,35.50,INR,EMP-2,Meals,T-102,Sales\\n"
+      "Transaction Date,Merchant,Amount,Currency,Employee ID,Category,Transaction ID,Department\n"
+      "2026-10-01,Metro Hotel,145.00,INR,EMP-1,Travel,T-100,Finance\n"
+      "2026-10-01,Metro Hotel,145.00,INR,EMP-1,Travel,T-101,Finance\n"
+      "2026-10-02,City Cafe,35.50,INR,EMP-2,Meals,T-102,Sales\n"
     )
     response=client.post("/v1/imports/analyze",
       files={"file":("company-expenses.csv",content,"text/csv")})
@@ -522,7 +522,7 @@ def test_upload_endpoint_analyzes_csv_without_api_key_and_does_not_persist(tmp_p
 def test_upload_endpoint_rejects_unrecognised_columns(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
     response=client.post("/v1/imports/analyze",
-      files={"file":("not-expenses.csv","foo,bar\\n1,2\\n","text/csv")})
+      files={"file":("not-expenses.csv","foo,bar\n1,2\n","text/csv")})
     assert response.status_code==422
     assert "date column" in response.json()["detail"]
 
