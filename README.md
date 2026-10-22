@@ -75,7 +75,7 @@ All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role
 
 ## Tests and CI
 
-Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions checks out the repository, installs dependencies, runs the tests, executes the synthetic pipeline and validation, and compiles Python source. **The hosted CI run for source commit 218ebf8 passed all steps**, including tests, pipeline and validation. Later commits update documentation only. [View GitHub Actions](https://github.com/Software-vikings/Spend-lens/actions).
+Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions checks out the repository, installs dependencies, runs the tests, executes the synthetic pipeline and validation, and compiles Python source. **The hosted CI run for latest main commit 95e3bb8 passed all steps**, including tests, pipeline and validation. Later commits update documentation only. [View GitHub Actions](https://github.com/Software-vikings/Spend-lens/actions).
 
 ## Power BI
 
