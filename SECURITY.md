@@ -5,8 +5,8 @@ SpendLens is an upload-first transaction-screening prototype. This document dist
 ## Upload processing
 
 - POST /v1/imports/analyze accepts CSV and XLSX uploads, with a 10 MB file-size limit and 10,000-row limit.
-- The route analyses the file in memory and returns a screening result.
-- Uploaded records are not inserted into the application database and no import history is retained by this workflow.
+- The route reads and analyses the file during the request and returns a screening result. Multipart upload handling may temporarily spool request data to server-managed temporary storage before the route reads it; the uploaded file is closed after processing.
+- Uploaded records are not inserted into the application database and no import history is retained by this workflow. Do not interpret that as a guarantee that bytes never touch disk: the multipart framework or operating system may use temporary storage during request handling.
 - The server receives the file contents and can access them during processing. "Not persisted" does not mean "never transmitted to or visible to the hosting server."
 - The endpoint is currently available without a user login. It has a per-IP upload request budget, but there is no organisation identity or tenant-level access control on the upload workflow.
 
