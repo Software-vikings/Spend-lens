@@ -200,6 +200,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
     @app.post("/v1/expenses/evaluate")
     def evaluate_expense_route(body: ExpenseEvaluationRequest,
                                _:str=Depends(require_role("analyst"))):
+        db()
         policy_path = ROOT / "policies" / "demo_policy.json"
         if not policy_path.exists():
             raise HTTPException(503, "Configured demo policy is missing")
