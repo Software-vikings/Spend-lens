@@ -151,7 +151,7 @@
         const payload={action:$("claim-resolution-action").value,reviewer:$("claim-resolution-reviewer").value,
           reason:$("claim-resolution-reason").value,evidence_note:$("claim-resolution-evidence").value};
         try{await api("/v1/claims/"+encodeURIComponent(id)+"/resolution",{method:"POST",body:JSON.stringify(payload)});
-          toast("Human resolution recorded.");await openClaim(id);await loadClaims();}
+          toast("Human resolution recorded.");await openClaim(id);await loadClaimPage();}
         catch(err){toast(err.message);}
       });
     }catch(e){toast(e.message);}
