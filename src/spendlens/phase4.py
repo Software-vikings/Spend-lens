@@ -36,6 +36,10 @@ def init_phase4(db_path: str | Path):
         CREATE INDEX IF NOT EXISTS idx_findings_status ON findings(review_status);
         CREATE INDEX IF NOT EXISTS idx_findings_type ON findings(finding_type);
         """)
+        columns = {row["name"] for row in c.execute("PRAGMA table_info(findings)")}
+        if "transaction_id" not in columns:
+            c.execute("ALTER TABLE findings ADD COLUMN transaction_id TEXT")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_findings_transaction ON findings(transaction_id)")
 
 def _identity(kind: str, row: dict) -> str:
     keys = {"anomaly":("transaction_id",),"recurring_payment_change":("subscription_id",),
@@ -64,14 +68,15 @@ def persist_findings(db_path: str | Path, groups: dict[str, list[dict]], run_id:
                 payload = json.dumps(row, sort_keys=True, default=str)
                 c.execute("""
                   INSERT INTO findings(finding_id,finding_type,fingerprint,title,severity,amount,currency,
-                    first_seen_at,last_seen_at,occurrences,source_payload)
-                  VALUES(?,?,?,?,?,?,?, ?,?,?,?)
+                    first_seen_at,last_seen_at,occurrences,source_payload,transaction_id)
+                  VALUES(?,?,?,?,?,?,?, ?,?,?,?,?)
                   ON CONFLICT(fingerprint) DO UPDATE SET
                     last_seen_at=excluded.last_seen_at,
                     occurrences=findings.occurrences+1,
-                    source_payload=excluded.source_payload
+                    source_payload=excluded.source_payload,
+                    transaction_id=excluded.transaction_id
                 """, (finding_id,kind,fp,_title(kind,row),severity,amount,
-                      row.get("currency","EUR"),now,now,1,payload))
+                      row.get("currency","EUR"),now,now,1,payload,row.get("transaction_id")))
                 count += 1
         c.execute("""INSERT OR REPLACE INTO pipeline_runs
           (run_id,started_at,transaction_count,finding_count,status) VALUES(?,?,?,?,?)""",

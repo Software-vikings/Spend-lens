@@ -1,40 +1,38 @@
 # SpendLens
 
-**An explainable business-spending intelligence prototype.**
+**Policy-based expense decision and exception-operations prototype.**
 
-SpendLens analyses synthetic company expense transactions to surface unusual patterns and potential cost inefficiencies for human review. It is an independent portfolio project and is not connected to Pleo, a bank or any real financial institution.
+SpendLens evaluates submitted expense claims against a versioned, configurable **synthetic demonstration policy**. It returns one of four outcomes—`APPROVE`, `REJECT`, `REVIEW` or `INSUFFICIENT_DATA`—with rule-level explanations, persists decisions, and routes exceptions through an assignment and human-resolution workflow.
 
-> **Demo data only:** all transactions are synthetic and denominated in EUR. Findings are screening signals, not fraud verdicts, policy determinations or proof of savings.
+This is an independent portfolio project. It is **not** connected to Pleo, a bank, an accounting platform or any real financial institution.
 
-## What it does
+> **Demo-data boundary:** the transaction ledger and example policy are synthetic. Findings and duplicate candidates are screening signals, not proof of fraud, policy violations or savings. Do not use real employee or financial data.
 
-- Generates reproducible synthetic company expense records and stores them in SQLite.
-- Screens unusually high transactions against merchant/category peers using median absolute deviation (MAD).
-- Identifies recurring-payment changes, merchant amount drift, duplicate candidates and fragmented-purchase patterns.
-- Analyses monthly department spend and spend per employee using explicit headcount inputs.
-- Exposes authenticated FastAPI endpoints for summary, analytics, transactions, findings and analyst review.
-- Provides a browser dashboard with spend overview, findings queue, transaction explorer and review history.
-- Supports interactive month, department and category cross-filtering: selecting a chart value updates matching spend metrics, other transaction charts and the ledger; the transaction KPI opens the filtered ledger and transaction rows show detail.
-- Produces SQL analytics, Power BI-ready CSV exports and a multi-seed validation report.
+## Implemented capabilities
 
-## Architecture
+- Deterministic expense evaluation against versioned policy documents, with explicit rule results and explanations.
+- Four distinct decision outcomes; missing or unreliable required information is not silently approved.
+- Persisted decisions, claims, submission history and receipt/evidence metadata.
+- Decision history with policy and engine version references.
+- Policy version creation and activation, with admin-only controls and audit events.
+- Exception queue with assignment/reassignment, priority, SLA deadlines, queue-wide metrics, sorting, filtering and pagination.
+- Human exception actions: request information, approve or reject. Human resolution history is preserved separately from the original automated outcome; terminal resolutions cannot be overwritten.
+- Transaction dashboard with month, department and category filtering; spend charts, ledger search, pagination and transaction detail.
+- Findings review workspace and audit trail for policy administration, claim assignment/resolution and finding review actions.
+- Exact transaction-to-finding drill-through only where the source finding carries the matching transaction ID.
+- API-key roles, input validation, parameterised SQL, request throttling, security headers and database-backed idempotency for expense evaluation.
+- Automated tests for decision rules, role access, audit atomicity, exception lifecycle, dashboard aggregates, pagination and concurrent idempotent submissions.
 
-```text
-Synthetic generator
-       |
-       v
-Validation -> SQLite database -> Detection / insight screens
-                                      |
-                                      v
-                                Persistent findings
-                                      |
-                         +------------+------------+
-                         |                         |
-                      FastAPI                 Power BI exports
-                         |
-                         v
-                 Browser analyst dashboard
-```
+## Decision semantics
+
+| Outcome | Meaning |
+|---|---|
+| `APPROVE` | Required inputs/evidence are present and the configured policy checks pass. |
+| `REJECT` | A configured deterministic hard-stop rule is conclusively violated. |
+| `REVIEW` | An exception or ambiguous/risk signal requires human assessment. |
+| `INSUFFICIENT_DATA` | Required information is missing or not reliable enough to evaluate. |
+
+An anomaly or duplicate-candidate signal does not, by itself, cause automatic rejection. The included policy is illustrative and must not be represented as any employer's actual policy.
 
 ## Run locally
 
@@ -45,7 +43,7 @@ git clone https://github.com/Software-vikings/Spend-lens.git
 cd Spend-lens
 
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+source .venv/bin/activate          # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 
 PYTHONPATH=src python -m spendlens.pipeline
@@ -53,45 +51,54 @@ PYTHONPATH=src python -m spendlens.validation
 PYTHONPATH=src pytest -q
 ```
 
-Create a long random API key (at least 24 characters), then start the API:
+Configure at least one long random API key (24+ characters) and start the API:
 
 ```bash
-export SPENDLENS_API_KEYS="YOUR_LONG_RANDOM_KEY:analyst"
+export SPENDLENS_API_KEYS="YOUR_LONG_RANDOM_KEY:analyst,ANOTHER_LONG_RANDOM_KEY:viewer"
 PYTHONPATH=src uvicorn spendlens.api:app --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000 and enter the API key. The dashboard stores it in the current browser tab's session storage. Do not commit real keys or use real employee/financial records.
+Open http://127.0.0.1:8000 and enter the API key. The dashboard retains it in the current browser tab's session storage. Never commit real keys.
 
-## API
+## Roles and key API areas
 
-- `GET /health` — health check
-- `GET /v1/summary` — spend and finding summary; accepts `month`, `department` and `category` filters
-- `GET /v1/analytics/overview` — monthly, department and category aggregates; accepts the same filters
-- `GET /v1/transactions` — searchable and paginated transactions; accepts the same filters
-- `GET /v1/findings` — findings queue
-- `GET /v1/findings/{finding_id}` — finding detail and review history
-- `PATCH /v1/findings/{finding_id}/review` — analyst review update
+- **Viewer:** read-only access to permitted dashboard, transaction, claim, decision and queue data.
+- **Analyst:** expense evaluation, finding review and exception assignment/resolution.
+- **Admin:** policy administration and audit-event access, in addition to permitted operational actions.
 
-All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role can update review state. The admin role currently has the same application permissions as analyst. The current cross-filtering applies to transaction spend, analytics and the transaction ledger. Finding counts and the findings list remain workspace-wide until every finding type has a reliable transaction-level relationship.
+Key API routes include:
 
-## Tests and CI
+- `GET /health`
+- `GET /v1/summary`, `GET /v1/analytics/overview`
+- `GET /v1/transactions`, `GET /v1/transactions/{transaction_id}`
+- `POST /v1/expenses/evaluate` (supports `Idempotency-Key`)
+- `GET /v1/decisions`, `GET /v1/decisions/{decision_id}`
+- `GET /v1/claims`, `GET /v1/claims/{claim_id}`
+- `GET /v1/exception-queue`
+- `POST /v1/claims/{claim_id}/assignment`
+- `POST /v1/claims/{claim_id}/resolution`
+- `GET /v1/policies`, `POST /v1/policies`, `POST /v1/policies/{policy_id}/{version}/activate`
+- `GET /v1/audit-events` (admin-only)
+- `GET /v1/findings`, `PATCH /v1/findings/{finding_id}/review`
 
-Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions checks out the repository, installs dependencies, runs the tests, executes the synthetic pipeline and validation, compiles Python source, and checks dashboard JavaScript syntax. **The hosted CI run for source commit `2900258` passed all steps**, including tests, pipeline and validation. Subsequent documentation updates were also checked by CI. [View GitHub Actions](https://github.com/Software-vikings/Spend-lens/actions).
+Consult the route definitions in `src/spendlens/api.py` for request schemas and supported query parameters.
 
-## Power BI
+## Verification
 
-The pipeline generates Power BI-ready CSV exports under `reports/`. See [Power BI build guide](powerbi/POWER_BI_BUILD_GUIDE.md) for the recommended semantic model, DAX measures and report pages. A native `.pbix` file is not included.
+The rebuild branch has automated coverage for the API, policy engine, exception workflow, audit history, dashboard aggregates, role permissions, idempotency and concurrent submissions. CI runs tests, the synthetic data pipeline, multi-seed validation, Python compilation and dashboard JavaScript syntax checks.
 
-## Employer showcase readiness
+Automated CI does **not** establish visual/browser acceptance, production security, deployment correctness or real-world policy effectiveness. Browser-based end-to-end verification has not been performed.
 
-**Current weighted estimate: 73%.** The complete application source, dashboard, tests, SQL, CI configuration, Docker configuration and project documentation are now present in this GitHub repository. Hosted CI has passed on the source commit. Remaining showcase work is tracked in [the execution tracker](EMPLOYER_SHOWCASE_READINESS.md#execution-tracker--22-october-2026): manual fresh-clone/API/dashboard verification, genuine screenshots, setup-instruction verification, Docker runtime, historical-only validation, Power BI and security checks.
+## Explicit limitations and production gaps
 
-See [EMPLOYER_SHOWCASE_READINESS.md](EMPLOYER_SHOWCASE_READINESS.md) for the scoring rubric, evidence and acceptance criteria.
+- Synthetic transactions and a synthetic example policy only; no employer policy discovery or real-world policy validation.
+- Receipt handling stores user-entered metadata only. No file upload, OCR, authenticity checks or independent evidence verification.
+- Reviewer/assignee names are self-reported; API-key roles are not an enterprise identity system.
+- No Pleo, bank, card, ERP or accounting integrations; no payment execution.
+- No tenant isolation, SSO/MFA, distributed rate limiting, managed secrets, formal penetration test or independent security review.
+- No verified production deployment, Docker runtime validation, backup/restore exercise or operational monitoring.
+- Findings are workspace-wide where a trustworthy transaction-level relationship is unavailable; related records are not inferred from matching amounts/dates.
+- The audit trail is transactionally written for supported audited actions, but is not cryptographically tamper-evident and does not prove the identity of the named human actor.
+- No browser interaction suite or visual regression evidence is claimed.
 
-## Evaluation limitations
-
-The validation dataset is synthetic and includes injected scenarios authored alongside the detector. Precision/recall figures measure recovery of those synthetic high-value outlier scenarios only; they do not estimate real-world fraud performance. The current peer baseline is in-sample and can use later-dated peer transactions, creating temporal leakage. A flag is not proof of fraud, policy violation, waste or supplier overcharging.
-
-## Security boundaries
-
-This is a portfolio prototype, not a production-certified financial control platform. API keys are static configuration values, rate limiting is in-memory and per process, and there is no tenant isolation, SSO/MFA, formal penetration test or verified cloud deployment. Do not expose publicly or load real financial data without additional security, privacy, operational and legal review. See [SECURITY.md](SECURITY.md).
+See [SECURITY.md](SECURITY.md) before running outside a local demo environment. This repository is a portfolio prototype, **not a production-certified financial control platform**.

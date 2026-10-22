@@ -9,3 +9,6 @@ reports/*.csv
 reports/*.json
 data/*.csv
 data/*.db
+
+# Private project prompts, decisions and working progress (never commit)
+.spendlens-private/
