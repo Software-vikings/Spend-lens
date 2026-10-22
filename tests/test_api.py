@@ -150,7 +150,7 @@ def test_dashboard_filters_support_category_and_reject_invalid_month(tmp_path):
 def test_expense_evaluation_is_persisted_and_retrievable(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
     body={"expense":{
-      "expense_id":"EXP-API-001","amount":"85.00","currency":"EUR",
+      "expense_id":"EXP-API-001","employee_id":"EMP-1001","merchant_name":"City Cafe","department":"Sales","amount":"85.00","currency":"EUR",
       "category":"Meals","transaction_date":"2026-05-14",
       "business_purpose":"Project working lunch",
       "receipt":{"provided":True,"readable":True,"receipt_id":"R-API-001","total":"85.00"}
@@ -171,7 +171,7 @@ def test_expense_evaluation_is_persisted_and_retrievable(tmp_path):
 def test_expense_evaluation_missing_evidence_is_not_approved(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
     body={"expense":{
-      "expense_id":"EXP-API-002","amount":"85.00","currency":"EUR",
+      "expense_id":"EXP-API-002","employee_id":"EMP-1002","merchant_name":"City Cafe","department":"Sales","amount":"85.00","currency":"EUR",
       "category":"Meals","transaction_date":"2026-05-14",
       "business_purpose":"Project working lunch","receipt":{"provided":False}
     }}
