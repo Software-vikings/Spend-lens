@@ -75,7 +75,7 @@ All `/v1/*` endpoints require an API key. Viewer role is read-only; analyst role
 
 ## Tests and CI
 
-Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions is configured to install dependencies, run tests, execute the synthetic pipeline and validation, and compile the Python source on pushes and pull requests. A workflow file being present is not itself proof of a green hosted run; check the Actions tab for the latest run.
+Run locally with `PYTHONPATH=src pytest -q`. GitHub Actions checks out the repository, installs dependencies, runs the tests, executes the synthetic pipeline and validation, and compiles Python source. **The hosted CI run for source commit 218ebf8 passed all steps**, including tests, pipeline and validation. Later commits update documentation only. [View GitHub Actions](https://github.com/Software-vikings/Spend-lens/actions).
 
 ## Power BI
 
@@ -83,7 +83,7 @@ The pipeline generates Power BI-ready CSV exports under `reports/`. See [Power B
 
 ## Employer showcase readiness
 
-**Current weighted estimate: 67%.** The full application source, dashboard, tests, SQL, CI configuration, Docker configuration and project documentation are now present in this GitHub repository. Remaining showcase blockers include a fresh-clone installation/run, a verified green hosted CI run, genuine dashboard screenshots, Docker build/runtime verification and stronger time-ordered analytical validation.
+**Current weighted estimate: 73%.** The complete application source, dashboard, tests, SQL, CI configuration, Docker configuration and project documentation are now present in this GitHub repository. Hosted CI has passed on the source commit. Remaining showcase work includes a manual fresh-clone/API/dashboard walkthrough, genuine screenshots, Docker build/runtime verification and stronger time-ordered analytical validation.
 
 See [EMPLOYER_SHOWCASE_READINESS.md](EMPLOYER_SHOWCASE_READINESS.md) for the scoring rubric, evidence and acceptance criteria.
 
