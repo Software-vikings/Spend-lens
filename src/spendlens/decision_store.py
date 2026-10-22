@@ -28,12 +28,17 @@ def init_decisions(db_path: str | Path) -> None:
         CREATE INDEX IF NOT EXISTS idx_expense_decisions_outcome ON expense_decisions(outcome);
         CREATE INDEX IF NOT EXISTS idx_expense_decisions_expense ON expense_decisions(expense_id, created_at);
         """)
+        # Serialize schema inspection and ALTER TABLE operations. API requests may
+        # initialise the store concurrently; without a write lock two workers can
+        # both observe a missing column and race to add it.
+        conn.execute("BEGIN IMMEDIATE")
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(expense_decisions)")}
         if "idempotency_key" not in columns:
             conn.execute("ALTER TABLE expense_decisions ADD COLUMN idempotency_key TEXT")
         if "request_hash" not in columns:
             conn.execute("ALTER TABLE expense_decisions ADD COLUMN request_hash TEXT")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_expense_decisions_idempotency ON expense_decisions(idempotency_key) WHERE idempotency_key IS NOT NULL")
+        conn.commit()
         conn.executescript("""
         CREATE TABLE IF NOT EXISTS expense_claims (
           claim_id TEXT PRIMARY KEY,
