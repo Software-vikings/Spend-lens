@@ -141,3 +141,6 @@ The product acceptance criteria and rebuild sequence are now defined in [PRODUCT
 - Product completion is re-scored at **49/100**, using the rubric in PRODUCT_SCOPE_AND_REBUILD_PLAN.md. The earlier 24/100 remains the pre-implementation baseline; 73% remains withdrawn.
 - Still open: first-class claim/evidence model, policy administration, full decision audit/override/re-evaluation lifecycle, complete state-driven dashboard and chart drill-through, browser tests, clean-clone walkthrough, Docker and security/dependency verification.
 - Draft PR #3 remains open and unmerged: https://github.com/Software-vikings/Spend-lens/pull/3
+
+
+- Latest PR-head CI verification: SpendLens CI run #71 (ID 39769318304) passed on 22 October 2026. Pytest: 44 passed, one Starlette/httpx deprecation warning; synthetic pipeline, multi-seed validation, Python compilation and JavaScript syntax checks passed. https://github.com/Software-vikings/Spend-lens/actions/runs/39769318304
