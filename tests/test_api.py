@@ -34,6 +34,11 @@ def test_findings_review_history(tmp_path):
     detail=client.get(f"/v1/findings/{fid}",headers={"X-API-Key":VIEWER}).json()
     assert detail["review_status"]=="under_review"
     assert len(detail["events"])==1
+    audit=client.get(f"/v1/audit-events?entity_type=finding&entity_id={fid}",
+      headers={"X-API-Key":ADMIN})
+    assert audit.status_code==200
+    assert [event["event_type"] for event in audit.json()["items"]]==["FINDING_REVIEW_UPDATED"]
+    assert client.get("/v1/audit-events",headers={"X-API-Key":VIEWER}).status_code==403
 
 def test_invalid_review_status_rejected(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
