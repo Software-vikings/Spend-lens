@@ -13,6 +13,7 @@ import re
 from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+from zipfile import BadZipFile, ZipFile
 from pathlib import PurePath
 from statistics import median
 from typing import Any
@@ -36,7 +37,7 @@ ALIASES = {
     "receipt_reference": {"receiptreference", "receiptid", "invoicereference", "invoicenumber", "receipt"},
 }
 
-OPTIONAL_FIELDS = ("employee_id", "department", "category", "business_purpose", "receipt_reference", "payment_method")
+OPTIONAL_FIELDS = ("employee_id", "department", "category", "currency", "business_purpose", "receipt_reference", "payment_method")
 REQUIRED_FIELDS = ("transaction_date", "merchant_name", "amount")
 
 
@@ -103,27 +104,44 @@ def _read_rows(filename: str, raw: bytes) -> tuple[list[str], list[tuple[int, di
         if not reader.fieldnames:
             raise ValueError("The CSV file needs a header row.")
         headers = [str(x or "").strip() for x in reader.fieldnames]
+        if len(headers) > 100:
+            raise ValueError("The file has more than 100 columns. Remove unused columns and retry.")
         rows = [(line_no, dict(row)) for line_no, row in enumerate(reader, start=2)
                 if any(str(v or "").strip() for v in row.values())]
+        if len(rows) > MAX_ROWS:
+            raise ValueError(f"File contains more than {MAX_ROWS:,} data rows. Split it into smaller files.")
     elif extension == ".xlsx":
         try:
             from openpyxl import load_workbook
         except ImportError as exc:
             raise ValueError("XLSX support is unavailable. Install the openpyxl dependency.") from exc
+        try:
+            with ZipFile(io.BytesIO(raw)) as archive:
+                expanded_size = sum(item.file_size for item in archive.infolist())
+                if expanded_size > 50 * 1024 * 1024:
+                    raise ValueError("The Excel workbook expands beyond the 50 MB safety limit.")
+        except BadZipFile as exc:
+            raise ValueError("The XLSX file is not a valid Excel workbook.") from exc
         workbook = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-        sheet = workbook.active
-        iterator = sheet.iter_rows(values_only=True)
-        header_values = next(iterator, None)
-        if not header_values:
-            raise ValueError("The Excel worksheet needs a header row.")
-        headers = [str(x or "").strip() for x in header_values]
-        rows = []
-        for line_no, values in enumerate(iterator, start=2):
-            if not any(v is not None and str(v).strip() for v in values):
-                continue
-            rows.append((line_no, {headers[i]: values[i] if i < len(values) else None
-                                   for i in range(len(headers))}))
-        workbook.close()
+        try:
+            sheet = workbook.active
+            iterator = sheet.iter_rows(values_only=True)
+            header_values = next(iterator, None)
+            if not header_values:
+                raise ValueError("The Excel worksheet needs a header row.")
+            headers = [str(x or "").strip() for x in header_values]
+            if len(headers) > 100:
+                raise ValueError("The worksheet has more than 100 columns. Remove unused columns and retry.")
+            rows = []
+            for line_no, values in enumerate(iterator, start=2):
+                if not any(v is not None and str(v).strip() for v in values):
+                    continue
+                rows.append((line_no, {headers[i]: values[i] if i < len(headers) else None
+                                       for i in range(len(headers))}))
+                if len(rows) > MAX_ROWS:
+                    raise ValueError(f"File contains more than {MAX_ROWS:,} data rows. Split it into smaller files.")
+        finally:
+            workbook.close()
     else:
         raise ValueError("Unsupported file type. Upload a .csv or .xlsx file.")
     if len(rows) > MAX_ROWS:
@@ -158,6 +176,8 @@ def _normalise_rows(raw_rows: list[tuple[int, dict]], mapping: dict[str, str | N
         try:
             tx_date = _parse_date(get("transaction_date"))
             amount = _parse_amount(get("amount"))
+            if amount == 0:
+                raise ValueError("amount is zero")
             merchant = str(get("merchant_name") or "").strip()
             if not merchant:
                 raise ValueError("merchant/payee is blank")
@@ -188,6 +208,14 @@ def _normalise_rows(raw_rows: list[tuple[int, dict]], mapping: dict[str, str | N
                 "signals": [],
                 "review_status": "NO_FLAG",
             })
+            if tx_date > date.today().isoformat():
+                accepted[-1]["signals"].append({
+                    "type": "FUTURE_DATE", "severity": "medium",
+                    "title": "Transaction date is in the future",
+                    "explanation": "The recorded transaction date is later than today. Check whether the source uses a planned date or an incorrect date format.",
+                    "evidence": {"transaction_date": tx_date},
+                })
+                accepted[-1]["review_status"] = "REVIEW"
         except (ValueError, InvalidOperation) as exc:
             errors.append({"row": line_no, "reason": str(exc)})
     return accepted, errors
