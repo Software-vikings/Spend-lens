@@ -4,7 +4,7 @@
 
 ## Scope and correction
 
-The peer-group anomaly detector screens unusually high individual transaction amounts. Earlier aggregate evaluation counted subscription price changes, duplicate purchases, fragmented purchases and merchant drift as if the peer detector were expected to detect them. That target-definition error is corrected: only high_value_outlier records are positive cases; ordinary records are negatives. Other injected scenario types are reported separately.
+The peer-group anomaly detector screens unusually high individual transaction amounts. Cohort statistics are now computed once per merchant/category group for efficient scoring; the scored transaction itself is included in its cohort baseline, while peer_count reports the other observations. Earlier aggregate evaluation counted subscription price changes, duplicate purchases, fragmented purchases and merchant drift as if the peer detector were expected to detect them. That target-definition error is corrected: only high_value_outlier records are positive cases; ordinary records are negatives. Other injected scenario types are reported separately.
 
 ## Multi-seed results
 
@@ -16,8 +16,8 @@ These unusually strong values result from conspicuously high outliers against re
 
 | Robust-score threshold | Mean precision | Mean recall | Mean F1 | Mean false positives |
 |---:|---:|---:|---:|---:|
-| 2.5 | 48.69% | 100.00% | 65.44% | 30.75 |
-| 3.0 | 84.59% | 100.00% | 91.36% | 5.75 |
+| 2.5 | 49.30% | 100.00% | 66.01% | 30.00 |
+| 3.0 | 85.01% | 100.00% | 91.66% | 5.50 |
 | 3.5 | 96.72% | 100.00% | 98.32% | 1.00 |
 | 4.0 | 100.00% | 100.00% | 100.00% | 0.00 |
 | 4.5 | 100.00% | 100.00% | 100.00% | 0.00 |
