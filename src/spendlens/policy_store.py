@@ -9,20 +9,28 @@ from .decision_engine import validate_policy
 
 def init_policy_registry(db_path: str | Path, seed_policy: dict | None = None) -> None:
     with connect(db_path) as conn:
-        conn.executescript("""
+        # Serialise schema creation and seed checks across simultaneous API requests.
+        # executescript() implicitly commits, so use individual statements after
+        # BEGIN IMMEDIATE to keep the whole initialisation atomic.
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("""
         CREATE TABLE IF NOT EXISTS policies (
           policy_id TEXT NOT NULL, version TEXT NOT NULL, name TEXT NOT NULL,
           document TEXT NOT NULL, created_at TEXT NOT NULL, created_by TEXT NOT NULL,
           PRIMARY KEY(policy_id,version)
-        );
+        )
+        """)
+        conn.execute("""
         CREATE TABLE IF NOT EXISTS policy_activations (
           activation_id INTEGER PRIMARY KEY AUTOINCREMENT,
           policy_id TEXT NOT NULL, version TEXT NOT NULL,
           activated_at TEXT NOT NULL, activated_by TEXT NOT NULL,
           FOREIGN KEY(policy_id,version) REFERENCES policies(policy_id,version)
-        );
+        )
+        """)
+        conn.execute("""
         CREATE INDEX IF NOT EXISTS idx_policy_activation_latest
-          ON policy_activations(policy_id,activation_id DESC);
+          ON policy_activations(policy_id,activation_id DESC)
         """)
         if seed_policy:
             validate_policy(seed_policy)
