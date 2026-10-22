@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
 from .decision_engine import evaluate_expense
 from .policy_store import init_policy_registry, create_policy_version, activate_policy_version, get_active_policy, list_policy_versions, get_policy_version
-from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate, resolve_claim
+from .decision_store import init_decisions, save_decision, list_decisions, get_decision, get_claim, list_claims, find_potential_duplicate, resolve_claim, assign_claim, list_exception_queue
 
 logger = logging.getLogger("spendlens.api")
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +30,21 @@ class ReviewUpdate(BaseModel):
     status: ReviewStatus
     reviewer: str = Field(min_length=2, max_length=100)
     note: str = Field(default="", max_length=2000)
+
+class ClaimAssignmentRequest(BaseModel):
+    assignee: str = Field(min_length=2, max_length=100)
+    assigned_by: str = Field(min_length=2, max_length=100)
+    priority: Literal["LOW","NORMAL","HIGH","URGENT"] = "NORMAL"
+    sla_hours: int = Field(default=24, ge=1, le=720)
+    note: str = Field(default="", max_length=1000)
+
+    @field_validator("assignee", "assigned_by")
+    @classmethod
+    def assignment_names_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Name cannot be blank")
+        return value.strip()
+
 
 class ClaimResolutionRequest(BaseModel):
     action: Literal["REQUEST_INFORMATION","APPROVE","REJECT"]
@@ -302,6 +317,28 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         if item is None:
             raise HTTPException(404,"Expense claim not found")
         return item
+
+    @app.get("/v1/exception-queue")
+    def exception_queue(status: str | None = None, assignee: str | None = None,
+                        priority: Literal["LOW","NORMAL","HIGH","URGENT"] | None = None,
+                        overdue: bool | None = None,
+                        limit: int = Query(50, ge=1, le=200),
+                        offset: int = Query(0, ge=0),
+                        _: str = Depends(require_role("viewer"))):
+        db()
+        return list_exception_queue(db_path, status, assignee, priority, overdue, limit, offset)
+
+    @app.post("/v1/claims/{claim_id}/assignment")
+    def claim_assignment(claim_id: str, body: ClaimAssignmentRequest,
+                         actor: str = Depends(require_role("analyst"))):
+        db()
+        try:
+            return assign_claim(db_path, claim_id, body.assignee, body.assigned_by,
+                                body.priority, body.sla_hours, body.note)
+        except LookupError as exc:
+            raise HTTPException(404, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
 
     @app.post("/v1/claims/{claim_id}/resolution")
     def claim_resolution(claim_id:str,body:ClaimResolutionRequest,
