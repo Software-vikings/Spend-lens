@@ -375,6 +375,9 @@ def test_claim_resolution_preserves_automated_decision_and_audits_actions(tmp_pa
     assert detail["current_status"]=="INSUFFICIENT_DATA"
     assert detail["resolution_status"]=="HUMAN_APPROVED"
     assert len(detail["resolution_history"])==2
+    terminal=client.post(url,headers={"X-API-Key":ANALYST},json={
+      "action":"REJECT","reviewer":"Analyst B","reason":"Attempt to overwrite final resolution"})
+    assert terminal.status_code==409
     decision=client.get(f"/v1/decisions/{original['decision_id']}",headers={"X-API-Key":VIEWER}).json()
     assert decision["outcome"]=="INSUFFICIENT_DATA"
     assert decision["evaluation"]["outcome"]=="INSUFFICIENT_DATA"
