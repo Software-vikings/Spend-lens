@@ -3,11 +3,13 @@
 **Review date:** 22 October 2026  
 **Branch:** `rebuild/decision-engine-and-dashboard`  
 **Pull request:** [#3](https://github.com/Software-vikings/Spend-lens/pull/3)  
-**Disposition:** Portfolio/demo candidate after local walkthrough; not production-ready.
+**Disposition:** Portfolio/demo candidate after local walkthrough; not production-ready. Latest CI rerun is pending after a concurrency fix.
 
 ## Verified in CI
 
-The latest verified implementation commit is `a0b550c192c5203f8e36898817bb176bc533a4d2`. CI runs #257 and #258 both completed successfully. The workflow ran:
+The earlier implementation commit `a0b550c192c5203f8e36898817bb176bc533a4d2` passed CI runs #257 and #258 (68 tests). A later run (#262) exposed a second concurrency race in policy-registry initialisation: concurrent expense requests could both seed the same `(policy_id, version)`, causing `sqlite3.IntegrityError: UNIQUE constraint failed`. Commit `654d2c382ab53d58fa68642ad51622ecb51ce088` fixes this by serialising schema creation and seed checks in a `BEGIN IMMEDIATE` transaction. CI runs #263 and #264 for that fix are queued; do not mark final CI green until they complete.
+
+The workflow runs:
 
 - Pytest suite, including the concurrent idempotent expense-submission regression test.
 - Synthetic data pipeline.
