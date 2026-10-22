@@ -66,6 +66,10 @@ def test_security_headers_and_rate_limit(tmp_path):
     first=client.get("/health")
     assert first.headers["X-Content-Type-Options"]=="nosniff"
     assert first.headers["Cache-Control"]=="no-store"
+    csp=first.headers["Content-Security-Policy"]
+    assert "script-src 'self'" in csp
+    assert "style-src 'self'" in csp
+    assert "frame-ancestors 'none'" in csp
     client.get("/health")
     assert client.get("/health").status_code==429
 
