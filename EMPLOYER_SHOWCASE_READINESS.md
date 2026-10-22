@@ -16,7 +16,7 @@ The score estimates how much work is complete toward making SpendLens independen
 | Analytical validity | 15 | 9 | Multi-seed synthetic evaluation, threshold sensitivity, ablation and limitations report exist. Historical-only temporal validation and independent benchmark data remain. |
 | Reproducible setup | 15 | 11 | README setup, dependencies and package metadata are present. Hosted clean checkout installed dependencies and ran pipeline, validation and tests. Manual API/browser startup from a fresh clone remains. |
 | Tests and CI | 15 | 13 | Five test modules are in GitHub; 30 tests passed locally. Hosted GitHub Actions run for source commit 2900258 passed checkout, dependency install, pytest, pipeline, validation and compilation. |
-| UX and demo evidence | 10 | 6 | Dashboard HTML/CSS/JS and interactions are in GitHub; API tests verify dashboard and asset routes. Genuine screenshots, walkthrough and hosted demo remain. |
+| UX and demo evidence | 10 | 6 | Dashboard now includes month/department/category cross-filtering, KPI-to-ledger navigation, clickable chart selections and transaction detail drill-through; API tests verify matching filtered aggregates. Genuine browser walkthrough, screenshots and hosted demo remain. |
 | SQL and Power BI | 10 | 7 | SQL schema/analytics and Power BI build guide are in GitHub. Pipeline-generated exports are reproducible; no native PBIX or report screenshots are included. |
 | Deployment and operations | 5 | 1 | Dockerfile, Compose and entrypoint are in GitHub. Docker build/runtime and public deployment are unverified. |
 | Security | 5 | 3 | API-key authentication, viewer/analyst roles, validation, security headers and security notes exist. No tenant isolation, SSO/MFA, formal penetration test or external security review. |
@@ -43,7 +43,7 @@ Runtime SQLite database, local caches, credentials and generated transaction/exp
 - Latest recorded local automated test result: **30 passed**.
 - Python source/test compilation passed.
 - Dashboard JavaScript syntax check passed.
-- GitHub Actions source commit **2900258** completed successfully, including the dashboard CSP correction and optimised cohort scoring. Steps verified: checkout, Python setup, dependency installation, pytest, synthetic pipeline, multi-seed validation and Python compilation.
+- GitHub Actions source commit **2900258** completed successfully, including the dashboard CSP correction and optimised cohort scoring. The later dashboard cross-filtering PR (#2) also passed hosted checks: dependency installation, pytest, synthetic pipeline, multi-seed validation and Python compilation. The PR was merged to `main` as commit `8305a4e`.
 - GitHub tree inspection confirmed the 34 tracked paths listed above.
 - The latest source commit includes the complete app modules, dashboard, tests, CI, SQL, Docker configuration, Power BI guide and updated documentation.
 
@@ -53,7 +53,7 @@ The successful hosted workflow verifies a clean GitHub checkout can install and 
 
 ### P0 — required before presenting as a finished portfolio project
 
-1. Clone the GitHub repository into a separate clean directory; start the API using the documented steps; open the dashboard; verify sign-in, summary charts, findings detail, review updates and transaction search.
+1. Clone the GitHub repository into a separate clean directory; start the API using the documented steps; open the dashboard; verify sign-in, summary charts, findings detail, review updates and transaction search. Also click month, department and category values and confirm the spend metrics, other transaction charts and ledger update together; click the transaction KPI and a transaction row to verify drill-through.
 2. Capture genuine screenshots of the overview, findings queue/detail and transaction explorer. Add them to the repository and README.
 3. Verify all README links and startup instructions from a clean clone.
 
@@ -87,7 +87,7 @@ This tracker records the remaining work as open until the stated acceptance evid
 
 | ID | Priority | Task | Acceptance evidence | Status |
 |---|---|---|---|---|
-| SHOW-01 | P0 | Fresh-clone application walkthrough | Clean clone starts successfully; sign-in, overview, findings detail, analyst review update and transaction search work in a browser | Open |
+| SHOW-01 | P0 | Fresh-clone application walkthrough | Clean clone starts successfully; sign-in, month/department/category cross-filtering, KPI-to-ledger navigation, transaction-row detail, findings detail, analyst review update and transaction search work in a browser | Open |
 | SHOW-02 | P0 | Capture dashboard evidence | Genuine screenshots for overview, findings queue/detail and transaction explorer committed and linked from README | Open |
 | SHOW-03 | P0 | Verify setup documentation | README commands and links verified from a separate clean clone | Open |
 | SHOW-04 | P1 | Docker runtime verification | Image builds; container starts; health check passes; persisted data survives container recreation | Open |
@@ -101,5 +101,5 @@ This tracker records the remaining work as open until the stated acceptance evid
 ### Execution notes
 
 - The repository's latest recorded hosted CI run is green; the CI workflow covers dependency installation, automated tests, the synthetic pipeline, multi-seed validation and Python compilation.
-- Manual browser behavior, Docker runtime, historical-only backtesting and native PBIX creation have not been verified. Do not mark these complete based solely on configuration files or automated unit tests.
+- The dashboard cross-filter/drill-through feature is implemented and its API tests pass, but manual browser behavior is still unverified. Docker runtime, historical-only backtesting and native PBIX creation have not been verified. Do not mark these complete based solely on configuration files or automated unit tests.
 - Update each row only after its acceptance evidence is committed or linked.
