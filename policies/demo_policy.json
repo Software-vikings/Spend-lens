@@ -1,0 +1,19 @@
+{
+  "policy_id": "SPENDLENS-SYNTHETIC-EXAMPLE",
+  "version": "1.0.0",
+  "name": "Synthetic demonstration expense policy",
+  "currency": "EUR",
+  "eligible_categories": ["Software", "Office Supplies", "Travel", "Meals", "Training"],
+  "blocked_categories": ["Personal Entertainment"],
+  "category_limits": {
+    "Software": 1500,
+    "Office Supplies": 500,
+    "Travel": 1200,
+    "Meals": 100,
+    "Training": 1000
+  },
+  "over_limit_action": "REVIEW",
+  "require_business_purpose": true,
+  "receipt_required_categories": ["Software", "Office Supplies", "Travel", "Meals", "Training"],
+  "notes": "Synthetic example values only. Replace with an authorised company's actual policy before any real use."
+}
