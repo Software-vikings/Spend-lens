@@ -89,6 +89,10 @@ def test_analytics_overview_requires_viewer_and_returns_series(tmp_path):
     assert data.status_code==200
     assert data.json()["monthly"]
     assert data.json()["departments"]
+    import sqlite3
+    with sqlite3.connect(db) as conn:
+        expected_categories=conn.execute("SELECT COUNT(DISTINCT category) FROM transactions").fetchone()[0]
+    assert len(data.json()["categories"])==expected_categories
 
 def test_dashboard_and_assets_are_served(tmp_path):
     db,_=prepared_db(tmp_path);client=TestClient(create_app(db,api_keys=KEYS))
