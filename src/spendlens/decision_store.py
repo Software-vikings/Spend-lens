@@ -288,6 +288,8 @@ def resolve_claim(db_path: str | Path, claim_id: str, action: str,
             "SELECT new_status FROM claim_resolution_events WHERE claim_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1",
             (claim_id,)).fetchone()
         previous_status = previous["new_status"] if previous else claim["current_status"]
+        if previous_status in ("HUMAN_APPROVED", "HUMAN_REJECTED"):
+            raise ValueError("This claim already has a terminal human resolution")
         new_status = statuses[action]
         resolution_id = str(uuid.uuid4())
         conn.execute(
