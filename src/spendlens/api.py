@@ -197,6 +197,24 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         return {"total":total,"limit":limit,"offset":offset,"items":[dict(r) for r in rows],
                 "active_filters":{"month":month,"department":department,"category":category}}
 
+    @app.get("/v1/transactions/{transaction_id}")
+    def transaction_detail(transaction_id: str, _:str=Depends(require_role("viewer"))):
+        """Return one ledger transaction and only findings linked by exact transaction ID."""
+        with db() as conn:
+            transaction = conn.execute(
+                "SELECT transaction_id,transaction_date,employee_id,department,merchant_id,merchant_name,category,amount,currency,payment_method "
+                "FROM transactions WHERE transaction_id=?", (transaction_id,)
+            ).fetchone()
+            if transaction is None:
+                raise HTTPException(404, "Transaction not found")
+            linked = conn.execute(
+                "SELECT finding_id,finding_type,title,severity,amount,currency,review_status,last_seen_at "
+                "FROM findings WHERE transaction_id=? ORDER BY last_seen_at DESC",
+                (transaction_id,)
+            ).fetchall()
+        return {"transaction": dict(transaction), "related_findings": [dict(row) for row in linked],
+                "relationship_note": "Findings are linked only when their source record contains this exact transaction ID. Expense claims and decisions are separate records until an explicit source relationship is supplied."}
+
     @app.post("/v1/expenses/evaluate")
     def evaluate_expense_route(body: ExpenseEvaluationRequest,
                                idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
