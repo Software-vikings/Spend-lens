@@ -78,7 +78,7 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
         response.headers["X-Frame-Options"]="DENY"
         response.headers["Referrer-Policy"]="no-referrer"
         response.headers["Cache-Control"]="no-store"
-        response.headers["Content-Security-Policy"]="default-src 'none'; frame-ancestors 'none'"
+        response.headers["Content-Security-Policy"]="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         return response
 
     def require_role(minimum: str):
