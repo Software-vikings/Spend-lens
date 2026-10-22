@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel, Field, field_validator
 from .phase4 import connect, init_phase4
 from .decision_engine import evaluate_expense
-from .decision_store import init_decisions, save_decision, list_decisions, get_decision
+from .decision_store import init_decisions, save_decision, list_decisions, get_decision, find_potential_duplicate
 
 logger = logging.getLogger("spendlens.api")
 ROOT = Path(__file__).resolve().parents[2]
@@ -208,8 +208,14 @@ def create_app(db_path: str | Path = DB_PATH, api_keys: dict[str,str] | None = N
             raise HTTPException(503, "Configured demo policy is missing")
         try:
             policy = json.loads(policy_path.read_text(encoding="utf-8"))
-            evaluation = evaluate_expense(body.expense, policy)
-            return save_decision(db_path, body.expense, evaluation)
+            expense = dict(body.expense)
+            duplicate_match = find_potential_duplicate(db_path, expense)
+            if duplicate_match:
+                # Similarity is a review signal only; never an automatic rejection.
+                expense["duplicate_suspected"] = True
+                expense["duplicate_match"] = duplicate_match
+            evaluation = evaluate_expense(expense, policy)
+            return save_decision(db_path, expense, evaluation)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
